@@ -1,86 +1,117 @@
-# This is a project help you build userscript with webpack
+# Stream Channeler Tuner
 
-Just [use this git repo as a template](https://github.com/Trim21/webpack-userscript-template/generate).
+A companion UserScript for [Stream Channeler](https://streamchanneler.com) that adds two features:
 
-[中文说明](./readme.cn.md)
+- **Controller** - Automatically plays through episodes in a channel sequentially, detecting when each episode ends and advancing to the next one. Supports YouTube, Crunchyroll, HBO Max, and Netflix.
+- **Antenna** - Assists in building channels by letting you queue shows from [JustWatch](https://www.justwatch.com) and bulk import them into Stream Channeler.
 
-## dev
+## Install
 
-1. Allow Tampermonkey's access to local file URIs [tampermonkey/faq](https://tampermonkey.net/faq.php?ext=dhdg#Q204)
-2. install deps with `npm i` or `npm ci`.
-3. `npm run dev` to start your development.
+1. Install [Tampermonkey](https://www.tampermonkey.net/) or a similar userscript manager.
+2. Install [Stream Channeler Tuner](https://ryn-cx.github.io/stream-channeler-tuner/index.prod.user.js).
 
-Now you will see 2 files in `./dist/`
+## Supported Sites
 
--   `dist/index.dev.user.js`: **You should install this userscript in your browser.** It's a simple loader that load `dist/index.debug.js` on matched web page.
--   `dist/index.debug.js`: This is the development build with `eval-source-map`. It will be automatically loaded by `dist/index.dev.user.js` via `@require file://.../dist/index.debug.js` metadata, **Don't add it to your userscript manager.**
+### Controller (auto-play episodes)
 
-4. edit [src/index.ts](./src/index.ts), you can even import css or less files. You can use scss if you like.
-5. go wo <https://www.example.com/> and open console, you'll see it's working.
+| Site | Detection Method |
+|------|-----------------|
+| YouTube | Class change on player element |
+| Crunchyroll | URL change |
+| HBO Max | URL change |
+| Netflix | URL change |
 
-livereload is default enabled, use [this Chrome extension](https://chrome.google.com/webstore/detail/jnihajbhpnppcggbcgedagnkighmdlei)
+### Antenna (queue shows)
 
-### NOTICE
+| Site | Action |
+|------|--------|
+| JustWatch | Add to Channel button on show pages |
 
-Everytime you change your metadata config,
-you'll have to restart webpack server and install newly generated `dist/index.dev.user.js` UserScript in your browser again.
+## Usage
 
-## used package
+### Controller
 
-If you prefer some other bundler like rollup, you can use some of these packages directly.
+1. Go to a channel on [streamchanneler.com](https://streamchanneler.com)
+2. Click **Start Remote Controller**
+3. Episodes will open, play, and advance automatically
 
-[userscript-metadata-generator](https://github.com/trim21/userscript-metadata-generator)
+### Antenna
 
-[gm-fetch](https://github.com/trim21/gm-fetch)
+1. Go to the [channels page](https://streamchanneler.com/channels) and open the **Bulk Import** modal
+2. Click **Load Channels** to load your channel list
+3. Browse shows on [JustWatch](https://www.justwatch.com) and use the **Add to Channel** button to queue them
+4. Return to the Bulk Import modal and click **Insert URLs** to populate the import field
 
-[userscript-metadata-webpack-plugin](https://github.com/trim21/userscript-metadata-webpack-plugin)
-
-## Cross Site Request
-
-you can call `GM.xmlHttpRequest` directly or use a fetch API based on `GM.xmlHttpRequest` <https://github.com/Trim21/gm-fetch>
-
-## TypeScript
-
-use typescript as normal, see [example](src/index.ts)
-
-## dependencies
-
-There are two ways to using a package on npm.
-
-### UserScript way
-
-like original UserScript way, you will need to add them to your [user script metadata's require section](./config/metadata.cjs#L16-L18) , and exclude them in [config/webpack.config.base.cjs](./config/webpack.config.base.cjs#L18-L20)
-
-### Webpack way
-
-just install packages with npm and import them in your code, webpack will take care them.
-
-## Build
+## Development
 
 ```bash
+npm install
 npm run build
 ```
 
-`dist/index.prod.user.js` is the final script. you can manually copy it to greasyfork for deploy.
+## Adding Plugins
 
-### Minify
+Plugins are auto-discovered from `src/controller_plugins/` and `src/antenna_plugins/`. To add support for a new site, create two files:
 
-There is a [limitation in greasyfork](https://greasyfork.org/en/help/code-rules), your code must not be obfuscated or minified.
+### Controller Plugin (auto-play episodes)
 
-If you don't need to deploy your script to greasyfork, enable minify as you like.
+A controller plugin detects when an episode ends on a streaming site and signals back to Stream Channeler.
 
-## automatically Deploy
+**`src/controller_plugins/example.matches.cjs`**
+```js
+module.exports = {
+  hostnames: ["example.com"],
+  matches: ["https://www.example.com/watch/*"],
+};
+```
 
-[github actions](./.github/workflows/deploy.yaml#L36) will deploy production userscript to gh-pages branch.
+**`src/controller_plugins/example.ts`**
+```ts
+import { initUrlChangePlugin } from "../shared";
 
-[example](https://github.com/Trim21/webpack-userscript-template/tree/gh-pages)
+export { hostnames, matches } from "./example.matches.cjs";
 
-[deployed](https://trim21.github.io/webpack-userscript-template/index.prod.user.js)
+export function init(): void {
+  const loading = GM_getValue("loadingTab", false);
+  if (!loading) return;
+  GM_setValue("loadingTab", false);
 
-You can auto use greasyfork's auto update function.
+  // For sites where episode end is detected by URL change, use the shared helper:
+  initUrlChangePlugin("Example");
 
-## Q&A
+  // For custom detection, use signalEpisodeEnded() from "../shared" when the episode ends.
+}
+```
 
-you may find enabling source map not working well in production code, because Tampermonkey will add extra lines (all your `@require`) before your script. I don't know if there is a good fix for this, You need to use webpack config `devtool` with `eval` prefix to make it work as expected, so source map is disabled in this production build.
+### Antenna Plugin (queue shows)
 
-<https://webpack.js.org/configuration/devtool/#development>
+An antenna plugin adds an "Add to Channel" button on a content discovery site.
+
+**`src/antenna_plugins/example.matches.cjs`**
+```js
+module.exports = {
+  hostnames: ["example.com"],
+  matches: ["https://www.example.com/*/show/*"],
+};
+```
+
+**`src/antenna_plugins/example.ts`**
+```ts
+import { getChannelQueues, setChannelQueues } from "../antenna";
+
+export { hostnames, matches } from "./example.matches.cjs";
+
+export function init(): void {
+  // Add UI elements to the page that let the user select a channel
+  // and queue the current URL using getChannelQueues/setChannelQueues.
+}
+```
+
+### Notes
+
+- The `.matches.cjs` file defines which URLs the script runs on. It is shared between the TypeScript plugin (runtime) and the build config (metadata generation).
+- No changes to `index.ts` or `metadata.cjs` are needed — new plugins are picked up automatically.
+- Controller plugins should check `GM_getValue("loadingTab", false)` and exit early if false, to avoid running on tabs not opened by Stream Channeler.
+- Use `signalEpisodeEnded()` from `shared.ts` to notify the controller that an episode has finished.
+
+For more details, check out the existing plugins: [YouTube (controller)](src/controller_plugins/youtube.ts) and [JustWatch (antenna)](src/antenna_plugins/justwatch.ts).
