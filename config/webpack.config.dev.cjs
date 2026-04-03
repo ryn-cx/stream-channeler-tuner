@@ -28,7 +28,8 @@ const cfg = merge(webpackConfig, {
     filename: "index.[name].js",
     path: path.resolve(__dirname, "../dist"),
   },
-  devtool: "eval-source-map",
+  // Some websites block eval so inline-source-map is better than eval-source-map
+  devtool: "inline-source-map",
   watch: true,
   watchOptions: {
     ignored: /node_modules/,

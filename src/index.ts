@@ -1,21 +1,36 @@
-import "./style/main.less";
+import { initController } from "./controller";
+import { initAntenna } from "./antenna";
 
-//checkout homepage https://github.com/Trim21/gm-fetch for @trim21/gm-fetch
-import GM_fetch from "@trim21/gm-fetch";
-
-async function main() {
-  console.log("script start");
-
-  // cross domain requests
-  console.log(`uuid: ${await fetchExample()}`);
+interface Plugin {
+  hostnames: string[];
+  matches: string[];
+  init: () => void;
 }
 
-async function fetchExample(): Promise<string> {
-  const res = await GM_fetch("https://httpbin.org/uuid");
-  const data = await res.json();
-  return data.uuid;
+function loadPlugins(ctx: __WebpackModuleApi.RequireContext): Plugin[] {
+  return ctx.keys().map((key) => ctx(key) as Plugin);
 }
 
-main().catch((e) => {
-  console.log(e);
-});
+const controllerPlugins = loadPlugins(
+  require.context("./controller_plugins", false, /\.ts$/),
+);
+const antennaPlugins = loadPlugins(
+  require.context("./antenna_plugins", false, /\.ts$/),
+);
+
+const controllerPlugin = controllerPlugins.find((p) =>
+  p.hostnames.some((h) => location.hostname.includes(h)),
+);
+const antennaPlugin = antennaPlugins.find((p) =>
+  p.hostnames.some((h) => location.hostname.includes(h)),
+);
+
+if (controllerPlugin) controllerPlugin.init();
+if (antennaPlugin) antennaPlugin.init();
+
+if (!controllerPlugin && !antennaPlugin) {
+  if (location.hostname.includes("streamchanneler.com")) {
+    initController();
+    initAntenna();
+  }
+}

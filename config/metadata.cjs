@@ -1,26 +1,36 @@
-const {
-  author,
-  dependencies,
-  repository,
-  version,
-} = require("../package.json");
+const fs = require("node:fs");
+const path = require("node:path");
+const { author, version, repository, description } = require("../package.json");
+
+// Dynamically load all of the plugins and get the domains they support
+function readMatches(dir) {
+  return fs.readdirSync(dir)
+    .filter((f) => f.endsWith(".matches.cjs"))
+    .flatMap((f) => require(path.join(dir, f)).matches);
+}
+const pluginMatches = [...new Set([
+  ...readMatches(path.resolve(__dirname, "../src/controller_plugins")),
+  ...readMatches(path.resolve(__dirname, "../src/antenna_plugins")),
+])];
 
 module.exports = {
-  name: {
-    $: "webpack-userscript-template",
-    cn: "中文名",
-    en: "english name",
-  },
-  namespace: "https://trim21.me/",
+  name: "Stream Channeler Tuner",
+  namespace: "https://streamchanneler.com/",
   version: version,
   author: author,
-  source: repository.url,
-  // 'license': 'MIT',
-  match: ["*://www.example.com/", "*://example.com/*"],
-  require: [
-    `https://cdn.jsdelivr.net/npm/jquery@${dependencies.jquery}/dist/jquery.min.js`,
+  description: description,
+  match: [
+    "https://streamchanneler.com/channels",
+    "https://streamchanneler.com/channels/*",
+    "http://localhost:5173/*", // TODO: Remove this for the first production release.
+    ...pluginMatches,
   ],
-  grant: ["GM.xmlHttpRequest"],
-  connect: ["httpbin.org"],
+  source: repository.url,
+  grant: [
+    "GM_setValue",
+    "GM_getValue",
+    "GM_addValueChangeListener",
+    "GM_deleteValue",
+  ],
   "run-at": "document-end",
 };

@@ -1,10 +1,9 @@
 {
-  "name": "webpack-userscript-template",
-  "description": "Build your UserScript with webpack",
+  "name": "stream-channeler-tuner",
+  "description": "Companion for Stream Channeler that controls media playback and assists in channel creation.",
   "version": "0.0.1",
   "author": {
-    "name": "Trim21",
-    "email": "trim21me@gmail.com"
+    "name": "ryn.cx"
   },
   "scripts": {
     "format": "prettier -w ./",
@@ -16,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/trim21/webpack-userscript-template"
+    "url": "https://github.com/ryn-cx/stream-channeler-tuner"
   },
   "private": true,
   "dependencies": {
@@ -32,6 +31,7 @@
     "@types/greasemonkey": "^4.0.7",
     "@types/jquery": "^4.0.0",
     "@types/node": "^22.17.0",
+    "@types/webpack-env": "^1.18.8",
     "browserslist": "^4.28.1",
     "cross-env": "^10.1.0",
     "css-loader": "^7.1.4",
