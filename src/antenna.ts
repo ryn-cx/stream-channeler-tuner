@@ -1,3 +1,4 @@
+// TODO: Validate
 const LOG = "[Stream Channeler Antenna]";
 
 // https://lucide.dev/icons/radio-tower
@@ -7,7 +8,11 @@ const LOAD_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height
 const INSERT_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-antenna-icon lucide-antenna"><path d="M2 12 7 2"/><path d="m7 12 5-10"/><path d="m12 12 5-10"/><path d="m17 12 5-10"/><path d="M4.5 7h15"/><path d="M12 16v6"/></svg>`;
 
 export interface AntennaChannels {
-  [channelId: string]: { name: string; urls: string[] };
+  [channelId: string]: { name: string; urls: string[]; showUrls: string[] };
+}
+
+interface ChannelShowsResponse {
+  shows: { url: string }[];
 }
 
 export function getChannelQueues(): AntennaChannels {
@@ -18,7 +23,33 @@ export function setChannelQueues(channels: AntennaChannels): void {
   GM_setValue("antennaChannels", channels);
 }
 
-function loadBlankChannels(): void {
+export function getLastChannelId(): string | null {
+  return GM_getValue("antennaLastChannelId", null) as string | null;
+}
+
+export function setLastChannelId(channelId: string): void {
+  GM_setValue("antennaLastChannelId", channelId);
+}
+
+async function fetchChannelShowUrls(channelId: string): Promise<string[]> {
+  const token = localStorage.getItem("access_token");
+  if (!token)
+    throw new Error(
+      `${LOG} No access_token in localStorage — log in to streamchanneler.com first`,
+    );
+  const response = await fetch(
+    `https://api.streamchanneler.com/api/v1/channels/${channelId}/shows`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok)
+    throw new Error(
+      `${LOG} Failed to fetch shows for channel ${channelId}: ${response.status}`,
+    );
+  const data = (await response.json()) as ChannelShowsResponse;
+  return data.shows.map((s) => s.url);
+}
+
+async function loadBlankChannels(): Promise<void> {
   const existing = getChannelQueues();
   const hasExisting =
     Object.keys(existing).length > 0 &&
@@ -42,12 +73,27 @@ function loadBlankChannels(): void {
   for (const link of links) {
     const match = link.getAttribute("href")?.match(/\/channels\/([a-f0-9-]+)/);
     if (!match) continue;
-    channels[match[1]] = { name: link.textContent.trim(), urls: [] };
+    channels[match[1]] = {
+      name: link.textContent.trim(),
+      urls: [],
+      showUrls: [],
+    };
   }
 
-  const count = Object.keys(channels).length;
+  // Fetch the shows already attached to each channel so plugins can detect when
+  // the current page URL is already present on a channel.
+  const ids = Object.keys(channels);
+  const showUrlLists = await Promise.all(ids.map(fetchChannelShowUrls));
+  let totalShows = 0;
+  ids.forEach((id, i) => {
+    channels[id].showUrls = showUrlLists[i];
+    totalShows += showUrlLists[i].length;
+  });
+
   setChannelQueues(channels);
-  alert(`Loaded ${count} channels into stream channeler antenna.`);
+  alert(
+    `Loaded ${ids.length} channels (${totalShows} shows) into stream channeler antenna.`,
+  );
 }
 
 function pasteQueue(): void {
@@ -88,7 +134,7 @@ function addButtonsToModal(dialog: Element): void {
   loadBtn.innerHTML = `${INSERT_ICON_SVG}Load Channels`;
   loadBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    loadBlankChannels();
+    void loadBlankChannels();
   });
 
   const insertBtn = document.createElement("button");

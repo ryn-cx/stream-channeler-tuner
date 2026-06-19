@@ -1,3 +1,7 @@
+// TODO: Validate
+const CHANNEL_PATH_RE =
+  /^\/channels\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i;
+
 // https://lucide.dev/icons/monitor-play
 const PLAY_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-monitor-play-icon lucide-monitor-play"><path d="M15.033 9.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56V7.648a.645.645 0 0 1 .967-.56z"/><path d="M12 17v4"/><path d="M8 21h8"/><rect x="2" y="3" width="20" height="14" rx="2"/></svg>`;
 
@@ -9,8 +13,35 @@ let currentIndex = 0;
 let running = false;
 let listenerRegistered = false;
 
+function promptSetCurrentIndex(): void {
+  const input = window.prompt(
+    `Set current episode (1-${cards.length}):`,
+    String(currentIndex + 1),
+  );
+  if (input === null) return;
+  const parsed = parseInt(input, 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > cards.length) return;
+  currentIndex = parsed - 1;
+  updateButton();
+}
+
+function handleButtonClick(event: MouseEvent): void {
+  const target = event.target as HTMLElement;
+  if (target.closest("#remote-control-counter")) {
+    event.preventDefault();
+    promptSetCurrentIndex();
+    return;
+  }
+  toggleRemoteController();
+}
+
 function updateButton(): void {
   let button = document.getElementById("remote-control-btn");
+
+  if (!CHANNEL_PATH_RE.test(location.pathname)) {
+    button?.remove();
+    return;
+  }
 
   if (!button) {
     const buttons = document.querySelectorAll<HTMLButtonElement>("button");
@@ -21,15 +52,15 @@ function updateButton(): void {
     button.id = "remote-control-btn";
     button.className = lastButton.className;
     button.setAttribute("data-slot", "button");
-    button.addEventListener("click", toggleRemoteController);
+    button.addEventListener("click", handleButtonClick);
     lastButton.parentElement.appendChild(button);
   }
 
   const icon = running ? STOP_ICON_SVG : PLAY_ICON_SVG;
-  const label = running
-    ? `Stop Remote Controller (${currentIndex + 1}/${cards.length})`
-    : `Start Remote Controller (${currentIndex}/${cards.length})`;
-  button.innerHTML = `${icon}${label}`;
+  const action = running ? "Stop Remote Controller" : "Start Remote Controller";
+  const displayed = running ? currentIndex + 1 : currentIndex;
+  const counter = `<span id="remote-control-counter" style="cursor:pointer;text-decoration:underline">${displayed}/${cards.length}</span>`;
+  button.innerHTML = `${icon}${action} (${counter})`;
 }
 
 function extractEpisodeInfo(card: HTMLElement): void {
