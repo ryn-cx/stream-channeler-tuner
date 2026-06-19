@@ -11,9 +11,15 @@
 // @match         https://play.hbomax.com/video/watch/*
 // @match         https://play.hbomax.com/show/*
 // @match         https://www.netflix.com/*
+// @match         https://www3.nhk.or.jp/nhkworld/en/shows/*
 // @match         https://www.youtube.com/watch*
+// @match         https://www.crunchyroll.com/series/*
 // @match         https://www.justwatch.com/*/tv-show/*
 // @match         https://www.justwatch.com/*/movie/*
+// @match         https://www.youtube.com/@*
+// @match         https://www.youtube.com/channel/*
+// @match         https://www.youtube.com/c/*
+// @match         https://www.youtube.com/user/*
 // @source        https://github.com/ryn-cx/stream-channeler-tuner
 // @grant         GM_setValue
 // @grant         GM_getValue
@@ -30,10 +36,13 @@
 
 "use strict";
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Bj: () => (/* binding */ getLastChannelId),
 /* harmony export */   EQ: () => (/* binding */ initAntenna),
+/* harmony export */   Nf: () => (/* binding */ setLastChannelId),
 /* harmony export */   YG: () => (/* binding */ getChannelQueues),
 /* harmony export */   k2: () => (/* binding */ setChannelQueues)
 /* harmony export */ });
+// TODO: Validate
 const LOG = "[Stream Channeler Antenna]";
 // https://lucide.dev/icons/radio-tower
 const LOAD_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-radio-tower"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><path d="M16.2 4.7a6.14 6.14 0 0 1 .8 7.5"/><path d="M19.1 1.9a10.14 10.14 0 0 1 0 14.2"/><path d="M9.56 14l-2.35 8.68"/><path d="M14.44 14l2.35 8.68"/><circle cx="12" cy="12" r="2"/></svg>`;
@@ -45,7 +54,23 @@ function getChannelQueues() {
 function setChannelQueues(channels) {
     GM_setValue("antennaChannels", channels);
 }
-function loadBlankChannels() {
+function getLastChannelId() {
+    return GM_getValue("antennaLastChannelId", null);
+}
+function setLastChannelId(channelId) {
+    GM_setValue("antennaLastChannelId", channelId);
+}
+async function fetchChannelShowUrls(channelId) {
+    const token = localStorage.getItem("access_token");
+    if (!token)
+        throw new Error(`${LOG} No access_token in localStorage — log in to streamchanneler.com first`);
+    const response = await fetch(`https://api.streamchanneler.com/api/v1/channels/${channelId}/shows`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok)
+        throw new Error(`${LOG} Failed to fetch shows for channel ${channelId}: ${response.status}`);
+    const data = (await response.json());
+    return data.shows.map((s) => s.url);
+}
+async function loadBlankChannels() {
     const existing = getChannelQueues();
     const hasExisting = Object.keys(existing).length > 0 &&
         Object.values(existing).some((ch) => ch.urls.length > 0);
@@ -64,11 +89,23 @@ function loadBlankChannels() {
         const match = link.getAttribute("href")?.match(/\/channels\/([a-f0-9-]+)/);
         if (!match)
             continue;
-        channels[match[1]] = { name: link.textContent.trim(), urls: [] };
+        channels[match[1]] = {
+            name: link.textContent.trim(),
+            urls: [],
+            showUrls: [],
+        };
     }
-    const count = Object.keys(channels).length;
+    // Fetch the shows already attached to each channel so plugins can detect when
+    // the current page URL is already present on a channel.
+    const ids = Object.keys(channels);
+    const showUrlLists = await Promise.all(ids.map(fetchChannelShowUrls));
+    let totalShows = 0;
+    ids.forEach((id, i) => {
+        channels[id].showUrls = showUrlLists[i];
+        totalShows += showUrlLists[i].length;
+    });
     setChannelQueues(channels);
-    alert(`Loaded ${count} channels into stream channeler antenna.`);
+    alert(`Loaded ${ids.length} channels (${totalShows} shows) into stream channeler antenna.`);
 }
 function pasteQueue() {
     const textarea = document.querySelector('[data-slot="dialog-content"] textarea');
@@ -102,7 +139,7 @@ function addButtonsToModal(dialog) {
     loadBtn.innerHTML = `${INSERT_ICON_SVG}Load Channels`;
     loadBtn.addEventListener("click", (e) => {
         e.preventDefault();
-        loadBlankChannels();
+        void loadBlankChannels();
     });
     const insertBtn = document.createElement("button");
     insertBtn.id = "antenna-insert-btn";
@@ -134,131 +171,375 @@ function initAntenna() {
 
 /***/ },
 
-/***/ "./src/antenna_plugins/justwatch.ts"
+/***/ "./src/antenna/crunchyroll/index.ts"
 (__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   hostnames: () => (/* reexport safe */ _justwatch_matches_cjs__WEBPACK_IMPORTED_MODULE_2__.hostnames),
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
 /* harmony export */   init: () => (/* binding */ init),
-/* harmony export */   matches: () => (/* reexport safe */ _justwatch_matches_cjs__WEBPACK_IMPORTED_MODULE_2__.matches)
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
 /* harmony export */ });
-/* harmony import */ var _antenna__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/antenna.ts");
-/* harmony import */ var _shared__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/shared.ts");
-/* harmony import */ var _justwatch_matches_cjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__("./src/antenna_plugins/justwatch.matches.cjs");
-/* harmony import */ var _justwatch_matches_cjs__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_justwatch_matches_cjs__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _antenna_plugin__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/antenna_plugin.ts");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/antenna/crunchyroll/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
 // TODO: Validate
 
 
-
-const LOG = "[Stream Channeler Antenna] [JustWatch]";
-function createUI(anchor) {
-    if (document.getElementById("antenna-justwatch-container"))
-        return;
-    const channels = (0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .getChannelQueues */ .YG)();
-    const channelEntries = Object.entries(channels);
-    const container = document.createElement("div");
-    container.id = "antenna-justwatch-container";
-    container.style.cssText =
-        "display:flex;gap:8px;align-items:center;padding:12px 0;";
-    const select = document.createElement("select");
-    select.id = "antenna-channel-select";
-    select.style.cssText =
-        "flex:1;padding:6px 10px;border-radius:4px;border:1px solid #3a4a5c;background:#1c252f;color:#fff;font-size:14px;";
-    for (const [id, ch] of channelEntries) {
-        const option = document.createElement("option");
-        option.value = id;
-        option.textContent = `${ch.name} (${ch.urls.length} queued)`;
-        select.appendChild(option);
-    }
-    const sourceInput = document.createElement("input");
-    sourceInput.id = "antenna-source-input";
-    sourceInput.type = "text";
-    sourceInput.placeholder = "Source (optional)";
-    sourceInput.style.cssText =
-        "width:150px;padding:6px 10px;border-radius:4px;border:1px solid #3a4a5c;background:#1c252f;color:#fff;font-size:14px;";
-    const btn = document.createElement("button");
-    btn.id = "antenna-add-btn";
-    btn.textContent = "Add to Channel";
-    btn.style.cssText =
-        "padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:#fbc500;color:#060d17;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;";
-    btn.addEventListener("click", () => {
-        const channelId = select.value;
-        if (!channelId)
-            return;
-        const source = sourceInput.value.trim();
-        const rawUrl = location.href;
-        const fullUrl = source ? `${source} ${rawUrl}` : rawUrl;
-        const allChannels = (0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .getChannelQueues */ .YG)();
-        const channel = allChannels[channelId];
-        if (!channel)
-            return;
-        if (channel.urls.includes(fullUrl)) {
-            console.log(`${LOG} URL already queued for channel "${channel.name}"`);
-            btn.textContent = "Already Added";
-            setTimeout(() => {
-                btn.textContent = "Add to Channel";
-            }, 2000);
-            return;
-        }
-        channel.urls.push(fullUrl);
-        (0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .setChannelQueues */ .k2)(allChannels);
-        console.log(`${LOG} Added "${fullUrl}" to channel "${channel.name}" (${channel.urls.length} total)`);
-        // Update the select option text to reflect new count
-        const option = select.querySelector(`option[value="${channelId}"]`);
-        if (option)
-            option.textContent = `${channel.name} (${channel.urls.length} queued)`;
-        btn.textContent = "Added!";
-        setTimeout(() => {
-            btn.textContent = "Add to Channel";
-        }, 2000);
-    });
-    container.appendChild(select);
-    container.appendChild(sourceInput);
-    container.appendChild(btn);
-    anchor.appendChild(container);
-    console.log(`${LOG} UI inserted with ${channelEntries.length} channels`);
-}
-function ensureUI() {
-    if (document.getElementById("antenna-justwatch-container"))
-        return;
-    const details = document.querySelector(".title-detail-hero__details");
-    if (details)
-        createUI(details);
-}
+// Crunchyroll series URLs look like /series/GT00375170/the-food-diary-of-miss-maid.
+// Match by series ID so the highlight survives slug or trailing-slash differences
+// between the page URL and the URL stored against a channel.
+const SERIES_ID_RE = /\/series\/([A-Z0-9]+)/;
 function init() {
-    console.log(`${LOG} Initializing on ${location.href}`);
-    // Insert at the bottom of the hero details section, and re-insert if Vue re-renders
-    (0,_shared__WEBPACK_IMPORTED_MODULE_1__/* .waitForElement */ .xk)(".title-detail-hero__details")
-        .then((details) => {
-        createUI(details);
-        new MutationObserver(ensureUI).observe(document.body, {
-            childList: true,
-            subtree: true,
-        });
-    })
-        .catch(() => {
-        console.log(`${LOG} Could not find title-detail-hero__details element`);
+    (0,_antenna_plugin__WEBPACK_IMPORTED_MODULE_0__/* .initAntennaPlugin */ .x)({
+        website_name: "Crunchyroll",
+        buttonColor: "#000000",
+        urlRegex: /\/series\/[A-Z0-9]+/,
+        waitSelector: "h1",
+        getCurrentUrl: () => location.href,
+        getMatchKey: (url) => url.match(SERIES_ID_RE)?.[1] ?? null,
     });
 }
 
 
 /***/ },
 
-/***/ "./src/controller_plugins/crunchyroll.ts"
+/***/ "./src/antenna/justwatch/index.ts"
 (__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   hostnames: () => (/* reexport safe */ _crunchyroll_matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
 /* harmony export */   init: () => (/* binding */ init),
-/* harmony export */   matches: () => (/* reexport safe */ _crunchyroll_matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
+/* harmony export */ });
+/* harmony import */ var _antenna_plugin__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/antenna_plugin.ts");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/antenna/justwatch/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+// TODO: Validate
+
+
+function init() {
+    (0,_antenna_plugin__WEBPACK_IMPORTED_MODULE_0__/* .initAntennaPlugin */ .x)({
+        website_name: "JustWatch",
+        buttonColor: "#fbc500",
+        textColor: "#060d17",
+        // JustWatch title pages look like /us/tv-show/<slug> or /us/movie/<slug>.
+        urlRegex: /\/(tv-show|movie)\//,
+        waitSelector: ".title-detail-hero__details",
+        getCurrentUrl: () => location.href,
+        getMatchKey: (url) => url,
+        showSourceInput: true,
+    });
+}
+
+
+/***/ },
+
+/***/ "./src/antenna/nhkworld/index.ts"
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
+/* harmony export */   init: () => (/* binding */ init),
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
+/* harmony export */ });
+/* harmony import */ var _antenna_plugin__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/antenna_plugin.ts");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/antenna/nhkworld/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+// TODO: Validate
+
+
+// NHK World show pages look like /nhkworld/en/shows/100years-midosuji/ where the
+// trailing segment is a slug, while individual episode/video pages use an
+// all-numeric id (e.g. /nhkworld/en/shows/2019439/). Only show pages should get
+// the "Add to Channel" button, so require a non-numeric trailing segment.
+const SHOW_PATH_RE = /^\/nhkworld\/en\/shows\/(?!\d+\/?$)[^/]+\/?$/;
+// Match by the show slug so the highlight survives trailing-slash differences
+// between the page URL and the URL stored against a channel.
+const SLUG_RE = /\/shows\/([^/]+)\/?$/;
+function init() {
+    (0,_antenna_plugin__WEBPACK_IMPORTED_MODULE_0__/* .initAntennaPlugin */ .x)({
+        website_name: "NHK World",
+        buttonColor: "#00a0c6",
+        urlRegex: SHOW_PATH_RE,
+        waitSelector: ".pProgramHero__main",
+        getCurrentUrl: () => location.href,
+        getMatchKey: (url) => url.match(SLUG_RE)?.[1] ?? null,
+    });
+}
+
+
+/***/ },
+
+/***/ "./src/antenna/youtube/index.ts"
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
+/* harmony export */   init: () => (/* binding */ init),
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
+/* harmony export */ });
+/* harmony import */ var _antenna_plugin__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/antenna_plugin.ts");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/antenna/youtube/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+// TODO: Validate
+
+
+// YouTube channels are reachable via several URL forms (/@handle, /channel/UC…,
+// /c/…, /user/…) but the Stream Channeler API stores them as /channel/UC…, so
+// match by the channel's UC… id pulled from page metadata.
+const CHANNEL_ID_RE = /\/channel\/(UC[\w-]+)/;
+function extractChannelId(url) {
+    return url.match(CHANNEL_ID_RE)?.[1] ?? null;
+}
+function getCurrentChannelId() {
+    // The /@handle URL doesn't contain the UC… id. YouTube renders a canonical
+    // <link> and several meta tags pointing at the /channel/UC… form — read those.
+    const canonical = document.querySelector('link[rel="canonical"]');
+    const fromCanonical = canonical ? extractChannelId(canonical.href) : null;
+    if (fromCanonical)
+        return fromCanonical;
+    const meta = document.querySelector('meta[itemprop="identifier"], meta[itemprop="channelId"]');
+    if (meta?.content?.startsWith("UC"))
+        return meta.content;
+    return extractChannelId(location.href);
+}
+function init() {
+    (0,_antenna_plugin__WEBPACK_IMPORTED_MODULE_0__/* .initAntennaPlugin */ .x)({
+        website_name: "YouTube",
+        buttonColor: "#ff0000",
+        urlRegex: /^\/(@|channel\/|c\/|user\/)/,
+        // YouTube's channel-page DOM rotates between Polymer rebuilds, so don't
+        // depend on a specific anchor — the footer floats over the page anyway.
+        waitSelector: "body",
+        getCurrentUrl: () => {
+            const id = getCurrentChannelId();
+            return id ? `https://www.youtube.com/channel/${id}` : location.href;
+        },
+        getMatchKey: extractChannelId,
+    });
+}
+
+
+/***/ },
+
+/***/ "./src/antenna_plugin.ts"
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   x: () => (/* binding */ initAntennaPlugin)
+/* harmony export */ });
+/* harmony import */ var _antenna__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/antenna.ts");
+/* harmony import */ var _shared__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/shared.ts");
+// TODO: Validate
+
+
+// Every site renders the same compact widget pinned to the bottom-right corner
+// so the UI looks consistent regardless of the host page's layout.
+const FOOTER_STYLE = "position:fixed;bottom:16px;right:16px;z-index:2147483647;display:flex;gap:8px;align-items:center;padding:8px 10px;background:rgba(15,15,15,0.92);border:1px solid #303030;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.5);font-family:system-ui,sans-serif;font-size:13px;";
+const SELECT_STYLE = "min-width:180px;padding:6px 10px;border-radius:4px;border:1px solid #3a4a5c;background:#1c252f;color:#fff;font-size:13px;";
+const INPUT_STYLE = "width:130px;padding:6px 10px;border-radius:4px;border:1px solid #3a4a5c;background:#1c252f;color:#fff;font-size:13px;";
+function initAntennaPlugin(config) {
+    const LOG = `[Stream Channeler Antenna] [${config.website_name}]`;
+    const containerId = `antenna-${config.website_name.toLowerCase()}-container`;
+    const textColor = config.textColor ?? "#fff";
+    // Tracks the user dismissing the footer. Intentionally not persisted — the
+    // footer reappears on the next page load and whenever the page changes.
+    let closed = false;
+    // The resolved URL the footer was last built for. Survives a manual close so
+    // that dismissing the footer keeps it hidden on the *same* page but navigating
+    // to a new page brings it back. Comparing the *resolved* URL (not
+    // location.href) lets derived metadata like YouTube's canonical <link> settle
+    // before rebuilding, avoiding a flash of stale highlight state.
+    let lastSeenUrl = null;
+    function createUI() {
+        if (document.getElementById(containerId))
+            return;
+        const channelEntries = Object.entries((0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .getChannelQueues */ .YG)());
+        const initialUrl = config.getCurrentUrl();
+        lastSeenUrl = initialUrl;
+        const currentKey = config.getMatchKey(initialUrl);
+        console.log(`${LOG} currentUrl=${initialUrl} currentKey=${currentKey}`);
+        if (!currentKey) {
+            console.warn(`${LOG} Could not extract a match key from the current page — highlight will be skipped`);
+        }
+        const isOnChannel = (channelName, showUrls) => {
+            if (!currentKey)
+                return false;
+            const urls = showUrls ?? [];
+            if (urls.length === 0) {
+                console.log(`${LOG} Channel "${channelName}" has no showUrls loaded (run "Load Channels" on /channels to populate)`);
+                return false;
+            }
+            const showKeys = urls.map(config.getMatchKey);
+            const match = showKeys.includes(currentKey);
+            console.log(`${LOG} Channel "${channelName}": ${urls.length} shows, keys=${JSON.stringify(showKeys)}, match=${match}`);
+            return match;
+        };
+        const optionTextFor = (channel) => {
+            const marker = isOnChannel(channel.name, channel.showUrls) ? "★ " : "";
+            return `${marker}${channel.name} (${channel.urls.length} queued)`;
+        };
+        const container = document.createElement("div");
+        container.id = containerId;
+        container.style.cssText = FOOTER_STYLE;
+        const title = document.createElement("span");
+        title.id = "antenna-title";
+        title.textContent = "Stream Channeler Antenna";
+        title.style.cssText = "color:#fff;font-weight:600;white-space:nowrap;";
+        const select = document.createElement("select");
+        select.id = "antenna-channel-select";
+        select.style.cssText = SELECT_STYLE;
+        for (const [id, channel] of channelEntries) {
+            const option = document.createElement("option");
+            option.value = id;
+            option.textContent = optionTextFor(channel);
+            if (isOnChannel(channel.name, channel.showUrls))
+                option.style.color = config.buttonColor;
+            select.appendChild(option);
+        }
+        // Restore the channel the user last selected (on any site) so the choice
+        // persists across pages, then keep it up to date as they change it.
+        const lastChannelId = (0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .getLastChannelId */ .Bj)();
+        if (lastChannelId && channelEntries.some(([id]) => id === lastChannelId)) {
+            select.value = lastChannelId;
+        }
+        select.addEventListener("change", () => {
+            if (select.value)
+                (0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .setLastChannelId */ .Nf)(select.value);
+        });
+        let sourceInput = null;
+        if (config.showSourceInput) {
+            sourceInput = document.createElement("input");
+            sourceInput.id = "antenna-source-input";
+            sourceInput.type = "text";
+            sourceInput.placeholder = "Source (optional)";
+            sourceInput.style.cssText = INPUT_STYLE;
+        }
+        const btn = document.createElement("button");
+        btn.id = "antenna-add-btn";
+        btn.textContent = "Add to Channel";
+        btn.style.cssText = `padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:${config.buttonColor};color:${textColor};font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;`;
+        btn.addEventListener("click", () => {
+            const channelId = select.value;
+            if (!channelId)
+                return;
+            (0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .setLastChannelId */ .Nf)(channelId);
+            // Re-read the URL on every click in case the SPA navigated without
+            // tearing down the UI.
+            const urlToQueue = config.getCurrentUrl();
+            const source = sourceInput?.value.trim() ?? "";
+            const fullUrl = source ? `${source} ${urlToQueue}` : urlToQueue;
+            const allChannels = (0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .getChannelQueues */ .YG)();
+            const channel = allChannels[channelId];
+            if (!channel)
+                return;
+            if (channel.urls.includes(fullUrl)) {
+                console.log(`${LOG} URL already queued for channel "${channel.name}"`);
+                btn.textContent = "Already Added";
+                setTimeout(() => {
+                    btn.textContent = "Add to Channel";
+                }, 2000);
+                return;
+            }
+            channel.urls.push(fullUrl);
+            (0,_antenna__WEBPACK_IMPORTED_MODULE_0__/* .setChannelQueues */ .k2)(allChannels);
+            console.log(`${LOG} Added "${fullUrl}" to channel "${channel.name}" (${channel.urls.length} total)`);
+            const option = select.querySelector(`option[value="${channelId}"]`);
+            if (option)
+                option.textContent = optionTextFor(channel);
+            btn.textContent = "Added!";
+            setTimeout(() => {
+                btn.textContent = "Add to Channel";
+            }, 2000);
+        });
+        const closeBtn = document.createElement("button");
+        closeBtn.id = "antenna-close-btn";
+        closeBtn.textContent = "×";
+        closeBtn.title = "Hide";
+        closeBtn.setAttribute("aria-label", "Hide");
+        closeBtn.style.cssText =
+            "background:transparent;border:none;color:#aaa;font-size:18px;line-height:1;cursor:pointer;padding:0 2px;";
+        closeBtn.addEventListener("click", () => {
+            closed = true;
+            removeUI();
+        });
+        container.appendChild(title);
+        container.appendChild(select);
+        if (sourceInput)
+            container.appendChild(sourceInput);
+        container.appendChild(btn);
+        container.appendChild(closeBtn);
+        document.body.appendChild(container);
+        console.log(`${LOG} UI inserted with ${channelEntries.length} channels`);
+    }
+    function removeUI() {
+        document.getElementById(containerId)?.remove();
+    }
+    function isValidPage() {
+        return !config.urlRegex || config.urlRegex.test(location.pathname);
+    }
+    function ensureUI() {
+        if (closed)
+            return;
+        if (!isValidPage()) {
+            removeUI();
+            return;
+        }
+        if (document.getElementById(containerId))
+            return;
+        createUI();
+    }
+    function onMutation() {
+        // SPA sites (e.g. YouTube) navigate by pushing a new URL without reloading,
+        // which would otherwise leave a stale footer in place. When the resolved
+        // URL changes, re-show a dismissed footer and rebuild it for the new page.
+        if (lastSeenUrl !== null && config.getCurrentUrl() !== lastSeenUrl) {
+            lastSeenUrl = config.getCurrentUrl();
+            closed = false;
+            removeUI();
+        }
+        ensureUI();
+    }
+    console.log(`${LOG} Initializing on ${location.href}`);
+    (0,_shared__WEBPACK_IMPORTED_MODULE_1__/* .waitForElement */ .xk)(config.waitSelector)
+        .then(() => {
+        ensureUI();
+        new MutationObserver(onMutation).observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+    })
+        .catch(() => {
+        console.log(`${LOG} Could not find anchor element`);
+    });
+}
+
+
+/***/ },
+
+/***/ "./src/controller/crunchyroll/index.ts"
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
+/* harmony export */   init: () => (/* binding */ init),
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
 /* harmony export */ });
 /* harmony import */ var _shared__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/shared.ts");
-/* harmony import */ var _crunchyroll_matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller_plugins/crunchyroll.matches.cjs");
-/* harmony import */ var _crunchyroll_matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_crunchyroll_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller/crunchyroll/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+// TODO: Validate
 
 
 function init() {
@@ -268,19 +549,20 @@ function init() {
 
 /***/ },
 
-/***/ "./src/controller_plugins/hbomax.ts"
+/***/ "./src/controller/hbomax/index.ts"
 (__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   hostnames: () => (/* reexport safe */ _hbomax_matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
 /* harmony export */   init: () => (/* binding */ init),
-/* harmony export */   matches: () => (/* reexport safe */ _hbomax_matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
 /* harmony export */ });
 /* harmony import */ var _shared__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/shared.ts");
-/* harmony import */ var _hbomax_matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller_plugins/hbomax.matches.cjs");
-/* harmony import */ var _hbomax_matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_hbomax_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller/hbomax/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+// TODO: Validate
 
 
 const LOG = `${_shared__WEBPACK_IMPORTED_MODULE_0__/* .CONTROLLER_LOG */ .c9} [HBO Max]`;
@@ -346,19 +628,20 @@ function init() {
 
 /***/ },
 
-/***/ "./src/controller_plugins/netflix.ts"
+/***/ "./src/controller/netflix/index.ts"
 (__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   hostnames: () => (/* reexport safe */ _netflix_matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
 /* harmony export */   init: () => (/* binding */ init),
-/* harmony export */   matches: () => (/* reexport safe */ _netflix_matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
 /* harmony export */ });
 /* harmony import */ var _shared__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/shared.ts");
-/* harmony import */ var _netflix_matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller_plugins/netflix.matches.cjs");
-/* harmony import */ var _netflix_matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_netflix_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller/netflix/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+// TODO: Validate
 
 
 const LOG = `${_shared__WEBPACK_IMPORTED_MODULE_0__/* .CONTROLLER_LOG */ .c9} [Netflix]`;
@@ -447,19 +730,77 @@ async function init() {
 
 /***/ },
 
-/***/ "./src/controller_plugins/youtube.ts"
+/***/ "./src/controller/nhkworld/index.ts"
 (__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   hostnames: () => (/* reexport safe */ _youtube_matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
 /* harmony export */   init: () => (/* binding */ init),
-/* harmony export */   matches: () => (/* reexport safe */ _youtube_matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
 /* harmony export */ });
 /* harmony import */ var _shared__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/shared.ts");
-/* harmony import */ var _youtube_matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller_plugins/youtube.matches.cjs");
-/* harmony import */ var _youtube_matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_youtube_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller/nhkworld/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+// TODO: Validate
+
+
+const LOG = `${_shared__WEBPACK_IMPORTED_MODULE_0__/* .CONTROLLER_LOG */ .c9} [NHK World]`;
+// NHK World embeds a video.js player. The play/pause control's text and title
+// flip to "Replay" once the video finishes, which is how we detect completion.
+function isReplay(button) {
+    if (button.getAttribute("title") === "Replay")
+        return true;
+    const text = button.querySelector(".vjs-control-text")?.textContent?.trim();
+    return text === "Replay";
+}
+async function init() {
+    // Only run the script if the tab was opened by Stream Channeler Controller.
+    const loading = GM_getValue("loadingTab", false);
+    if (!loading)
+        return;
+    GM_setValue("loadingTab", false);
+    // The play control is injected by video.js after the page loads, so wait for
+    // it before watching for the "Replay" state.
+    const button = await (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .waitForElement */ .xk)(".vjs-play-control");
+    console.log(`${LOG} Play control found, watching for completion`);
+    if (isReplay(button)) {
+        (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .signalEpisodeEnded */ .e$)();
+        return;
+    }
+    const observer = new MutationObserver(() => {
+        if (isReplay(button)) {
+            observer.disconnect();
+            (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .signalEpisodeEnded */ .e$)();
+        }
+    });
+    observer.observe(button, {
+        attributes: true,
+        attributeFilter: ["title", "class"],
+        childList: true,
+        subtree: true,
+        characterData: true,
+    });
+}
+
+
+/***/ },
+
+/***/ "./src/controller/youtube/index.ts"
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   hostnames: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.hostnames),
+/* harmony export */   init: () => (/* binding */ init),
+/* harmony export */   matches: () => (/* reexport safe */ _matches_cjs__WEBPACK_IMPORTED_MODULE_1__.matches)
+/* harmony export */ });
+/* harmony import */ var _shared__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__("./src/shared.ts");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__("./src/controller/youtube/matches.cjs");
+/* harmony import */ var _matches_cjs__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_matches_cjs__WEBPACK_IMPORTED_MODULE_1__);
+// TODO: Validate
 
 const LOG = `${_shared__WEBPACK_IMPORTED_MODULE_0__/* .CONTROLLER_LOG */ .c9} [YouTube]`;
 
@@ -603,11 +944,14 @@ function initUrlChangePlugin(name) {
 
 /***/ },
 
-/***/ "./src/antenna_plugins sync \\.ts$"
+/***/ "./src/antenna sync recursive \\/index\\.ts$"
 (module, __unused_webpack_exports, __webpack_require__) {
 
 var map = {
-	"./justwatch.ts": "./src/antenna_plugins/justwatch.ts"
+	"./crunchyroll/index.ts": "./src/antenna/crunchyroll/index.ts",
+	"./justwatch/index.ts": "./src/antenna/justwatch/index.ts",
+	"./nhkworld/index.ts": "./src/antenna/nhkworld/index.ts",
+	"./youtube/index.ts": "./src/antenna/youtube/index.ts"
 };
 
 
@@ -628,18 +972,19 @@ webpackContext.keys = function webpackContextKeys() {
 };
 webpackContext.resolve = webpackContextResolve;
 module.exports = webpackContext;
-webpackContext.id = "./src/antenna_plugins sync \\.ts$";
+webpackContext.id = "./src/antenna sync recursive \\/index\\.ts$";
 
 /***/ },
 
-/***/ "./src/controller_plugins sync \\.ts$"
+/***/ "./src/controller sync recursive \\/index\\.ts$"
 (module, __unused_webpack_exports, __webpack_require__) {
 
 var map = {
-	"./crunchyroll.ts": "./src/controller_plugins/crunchyroll.ts",
-	"./hbomax.ts": "./src/controller_plugins/hbomax.ts",
-	"./netflix.ts": "./src/controller_plugins/netflix.ts",
-	"./youtube.ts": "./src/controller_plugins/youtube.ts"
+	"./crunchyroll/index.ts": "./src/controller/crunchyroll/index.ts",
+	"./hbomax/index.ts": "./src/controller/hbomax/index.ts",
+	"./netflix/index.ts": "./src/controller/netflix/index.ts",
+	"./nhkworld/index.ts": "./src/controller/nhkworld/index.ts",
+	"./youtube/index.ts": "./src/controller/youtube/index.ts"
 };
 
 
@@ -660,22 +1005,63 @@ webpackContext.keys = function webpackContextKeys() {
 };
 webpackContext.resolve = webpackContextResolve;
 module.exports = webpackContext;
-webpackContext.id = "./src/controller_plugins sync \\.ts$";
+webpackContext.id = "./src/controller sync recursive \\/index\\.ts$";
 
 /***/ },
 
-/***/ "./src/antenna_plugins/justwatch.matches.cjs"
+/***/ "./src/antenna/crunchyroll/matches.cjs"
+(module) {
+
+module.exports = {
+  hostnames: ["crunchyroll.com"],
+  matches: ["https://www.crunchyroll.com/series/*"],
+};
+
+
+/***/ },
+
+/***/ "./src/antenna/justwatch/matches.cjs"
 (module) {
 
 module.exports = {
   hostnames: ["justwatch.com"],
-  matches: ["https://www.justwatch.com/*/tv-show/*", "https://www.justwatch.com/*/movie/*"],
+  matches: [
+    "https://www.justwatch.com/*/tv-show/*",
+    "https://www.justwatch.com/*/movie/*",
+  ],
 };
 
 
 /***/ },
 
-/***/ "./src/controller_plugins/crunchyroll.matches.cjs"
+/***/ "./src/antenna/nhkworld/matches.cjs"
+(module) {
+
+module.exports = {
+  hostnames: ["nhk.or.jp"],
+  matches: ["https://www3.nhk.or.jp/nhkworld/en/shows/*"],
+};
+
+
+/***/ },
+
+/***/ "./src/antenna/youtube/matches.cjs"
+(module) {
+
+module.exports = {
+  hostnames: ["youtube.com"],
+  matches: [
+    "https://www.youtube.com/@*",
+    "https://www.youtube.com/channel/*",
+    "https://www.youtube.com/c/*",
+    "https://www.youtube.com/user/*",
+  ],
+};
+
+
+/***/ },
+
+/***/ "./src/controller/crunchyroll/matches.cjs"
 (module) {
 
 module.exports = {
@@ -686,7 +1072,7 @@ module.exports = {
 
 /***/ },
 
-/***/ "./src/controller_plugins/hbomax.matches.cjs"
+/***/ "./src/controller/hbomax/matches.cjs"
 (module) {
 
 module.exports = {
@@ -700,7 +1086,7 @@ module.exports = {
 
 /***/ },
 
-/***/ "./src/controller_plugins/netflix.matches.cjs"
+/***/ "./src/controller/netflix/matches.cjs"
 (module) {
 
 module.exports = {
@@ -711,7 +1097,18 @@ module.exports = {
 
 /***/ },
 
-/***/ "./src/controller_plugins/youtube.matches.cjs"
+/***/ "./src/controller/nhkworld/matches.cjs"
+(module) {
+
+module.exports = {
+  hostnames: ["nhk.or.jp"],
+  matches: ["https://www3.nhk.or.jp/nhkworld/en/shows/*"],
+};
+
+
+/***/ },
+
+/***/ "./src/controller/youtube/matches.cjs"
 (module) {
 
 module.exports = {
@@ -796,6 +1193,8 @@ var __webpack_exports__ = {};
 "use strict";
 
 ;// ./src/controller.ts
+// TODO: Validate
+const CHANNEL_PATH_RE = /^\/channels\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$/i;
 // https://lucide.dev/icons/monitor-play
 const PLAY_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-monitor-play-icon lucide-monitor-play"><path d="M15.033 9.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56V7.648a.645.645 0 0 1 .967-.56z"/><path d="M12 17v4"/><path d="M8 21h8"/><rect x="2" y="3" width="20" height="14" rx="2"/></svg>`;
 // https://lucide.dev/icons/monitor-x
@@ -804,8 +1203,31 @@ let cards = [];
 let currentIndex = 0;
 let running = false;
 let listenerRegistered = false;
+function promptSetCurrentIndex() {
+    const input = window.prompt(`Set current episode (1-${cards.length}):`, String(currentIndex + 1));
+    if (input === null)
+        return;
+    const parsed = parseInt(input, 10);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > cards.length)
+        return;
+    currentIndex = parsed - 1;
+    updateButton();
+}
+function handleButtonClick(event) {
+    const target = event.target;
+    if (target.closest("#remote-control-counter")) {
+        event.preventDefault();
+        promptSetCurrentIndex();
+        return;
+    }
+    toggleRemoteController();
+}
 function updateButton() {
     let button = document.getElementById("remote-control-btn");
+    if (!CHANNEL_PATH_RE.test(location.pathname)) {
+        button?.remove();
+        return;
+    }
     if (!button) {
         const buttons = document.querySelectorAll("button");
         const lastButton = buttons[buttons.length - 1];
@@ -815,14 +1237,14 @@ function updateButton() {
         button.id = "remote-control-btn";
         button.className = lastButton.className;
         button.setAttribute("data-slot", "button");
-        button.addEventListener("click", toggleRemoteController);
+        button.addEventListener("click", handleButtonClick);
         lastButton.parentElement.appendChild(button);
     }
     const icon = running ? STOP_ICON_SVG : PLAY_ICON_SVG;
-    const label = running
-        ? `Stop Remote Controller (${currentIndex + 1}/${cards.length})`
-        : `Start Remote Controller (${currentIndex}/${cards.length})`;
-    button.innerHTML = `${icon}${label}`;
+    const action = running ? "Stop Remote Controller" : "Start Remote Controller";
+    const displayed = running ? currentIndex + 1 : currentIndex;
+    const counter = `<span id="remote-control-counter" style="cursor:pointer;text-decoration:underline">${displayed}/${cards.length}</span>`;
+    button.innerHTML = `${icon}${action} (${counter})`;
 }
 function extractEpisodeInfo(card) {
     const text = card.textContent ?? "";
@@ -928,8 +1350,8 @@ var antenna = __webpack_require__("./src/antenna.ts");
 function loadPlugins(ctx) {
     return ctx.keys().map((key) => ctx(key));
 }
-const controllerPlugins = loadPlugins(__webpack_require__("./src/controller_plugins sync \\.ts$"));
-const antennaPlugins = loadPlugins(__webpack_require__("./src/antenna_plugins sync \\.ts$"));
+const controllerPlugins = loadPlugins(__webpack_require__("./src/controller sync recursive \\/index\\.ts$"));
+const antennaPlugins = loadPlugins(__webpack_require__("./src/antenna sync recursive \\/index\\.ts$"));
 const controllerPlugin = controllerPlugins.find((p) => p.hostnames.some((h) => location.hostname.includes(h)));
 const antennaPlugin = antennaPlugins.find((p) => p.hostnames.some((h) => location.hostname.includes(h)));
 if (controllerPlugin)
