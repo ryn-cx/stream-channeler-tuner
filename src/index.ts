@@ -12,10 +12,10 @@ function loadPlugins(ctx: __WebpackModuleApi.RequireContext): Plugin[] {
 }
 
 const controllerPlugins = loadPlugins(
-  require.context("./controller_plugins", false, /\.ts$/),
+  require.context("./controller", true, /\/index\.ts$/),
 );
 const antennaPlugins = loadPlugins(
-  require.context("./antenna_plugins", false, /\.ts$/),
+  require.context("./antenna", true, /\/index\.ts$/),
 );
 
 const controllerPlugin = controllerPlugins.find((p) =>

@@ -1,8 +1,9 @@
-import { CONTROLLER_LOG, signalEpisodeEnded } from "../shared";
+// TODO: Validate
+import { CONTROLLER_LOG, signalEpisodeEnded } from "../../shared";
 
 const LOG = `${CONTROLLER_LOG} [YouTube]`;
 
-export { hostnames, matches } from "./youtube.matches.cjs";
+export { hostnames, matches } from "./matches.cjs";
 
 export function init(): void {
   // Only run the script if the tab was opened by Stream Channeler Controller.

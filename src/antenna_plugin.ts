@@ -8,23 +8,12 @@ import {
 import { waitForElement } from "./shared";
 
 export interface AntennaPluginConfig {
-  /** Display name — used in console logs and the container element id. */
-  name: string;
-  /** Brand color — used for the button background and the highlight color. */
-  brandColor: string;
-  /** Button text color (defaults to white). */
-  buttonTextColor?: string;
-  /** Restrict the UI to pages whose pathname matches this regex. */
-  pathFilter?: RegExp;
+  website_name: string;
+  buttonColor: string;
+  textColor?: string;
+  urlRegex?: RegExp;
   /** A selector to wait for before trying to insert the UI. */
   waitSelector: string;
-  /**
-   * Returns an element that signals the current page is a valid target (e.g.
-   * the page's title element), or null when it isn't. The UI itself always
-   * renders as a fixed footer, so the returned element is used only as a
-   * readiness/validity gate — not as an insertion point.
-   */
-  findAnchor: () => HTMLElement | null;
   /** Returns the URL to queue when the user clicks "Add to Channel". */
   getCurrentUrl: () => string;
   /** Extracts the comparable identity from a URL (channel id, series id, or just the URL itself). */
@@ -44,9 +33,9 @@ const INPUT_STYLE =
   "width:130px;padding:6px 10px;border-radius:4px;border:1px solid #3a4a5c;background:#1c252f;color:#fff;font-size:13px;";
 
 export function initAntennaPlugin(config: AntennaPluginConfig): void {
-  const LOG = `[Stream Channeler Antenna] [${config.name}]`;
-  const containerId = `antenna-${config.name.toLowerCase()}-container`;
-  const buttonTextColor = config.buttonTextColor ?? "#fff";
+  const LOG = `[Stream Channeler Antenna] [${config.website_name}]`;
+  const containerId = `antenna-${config.website_name.toLowerCase()}-container`;
+  const textColor = config.textColor ?? "#fff";
 
   // Tracks the user dismissing the footer. Intentionally not persisted — the
   // footer reappears on the next page load and whenever the page changes.
@@ -119,7 +108,7 @@ export function initAntennaPlugin(config: AntennaPluginConfig): void {
       option.value = id;
       option.textContent = optionTextFor(channel);
       if (isOnChannel(channel.name, channel.showUrls))
-        option.style.color = config.brandColor;
+        option.style.color = config.buttonColor;
       select.appendChild(option);
     }
 
@@ -145,7 +134,7 @@ export function initAntennaPlugin(config: AntennaPluginConfig): void {
     const btn = document.createElement("button");
     btn.id = "antenna-add-btn";
     btn.textContent = "Add to Channel";
-    btn.style.cssText = `padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:${config.brandColor};color:${buttonTextColor};font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;`;
+    btn.style.cssText = `padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:${config.buttonColor};color:${textColor};font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;`;
 
     btn.addEventListener("click", () => {
       const channelId = select.value;
@@ -215,9 +204,7 @@ export function initAntennaPlugin(config: AntennaPluginConfig): void {
   }
 
   function isValidPage(): boolean {
-    if (config.pathFilter && !config.pathFilter.test(location.pathname))
-      return false;
-    return config.findAnchor() != null;
+    return !config.urlRegex || config.urlRegex.test(location.pathname);
   }
 
   function ensureUI(): void {

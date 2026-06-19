@@ -1,7 +1,7 @@
 // TODO: Validate
-import { initAntennaPlugin } from "../antenna_plugin";
+import { initAntennaPlugin } from "../../antenna_plugin";
 
-export { hostnames, matches } from "./youtube.matches.cjs";
+export { hostnames, matches } from "./matches.cjs";
 
 // YouTube channels are reachable via several URL forms (/@handle, /channel/UC…,
 // /c/…, /user/…) but the Stream Channeler API stores them as /channel/UC…, so
@@ -31,13 +31,12 @@ function getCurrentChannelId(): string | null {
 
 export function init(): void {
   initAntennaPlugin({
-    name: "YouTube",
-    brandColor: "#ff0000",
-    pathFilter: /^\/(@|channel\/|c\/|user\/)/,
+    website_name: "YouTube",
+    buttonColor: "#ff0000",
+    urlRegex: /^\/(@|channel\/|c\/|user\/)/,
     // YouTube's channel-page DOM rotates between Polymer rebuilds, so don't
     // depend on a specific anchor — the footer floats over the page anyway.
     waitSelector: "body",
-    findAnchor: () => document.body,
     getCurrentUrl: () => {
       const id = getCurrentChannelId();
       return id ? `https://www.youtube.com/channel/${id}` : location.href;

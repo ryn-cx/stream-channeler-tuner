@@ -1,6 +1,11 @@
-import { CONTROLLER_LOG, initUrlChangePlugin, waitForElement } from "../shared";
+// TODO: Validate
+import {
+  CONTROLLER_LOG,
+  initUrlChangePlugin,
+  waitForElement,
+} from "../../shared";
 
-export { hostnames, matches } from "./netflix.matches.cjs";
+export { hostnames, matches } from "./matches.cjs";
 
 const LOG = `${CONTROLLER_LOG} [Netflix]`;
 

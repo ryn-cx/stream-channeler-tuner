@@ -1,7 +1,11 @@
 // TODO: Validate
-import { CONTROLLER_LOG, signalEpisodeEnded, waitForElement } from "../shared";
+import {
+  CONTROLLER_LOG,
+  signalEpisodeEnded,
+  waitForElement,
+} from "../../shared";
 
-export { hostnames, matches } from "./nhkworld.matches.cjs";
+export { hostnames, matches } from "./matches.cjs";
 
 const LOG = `${CONTROLLER_LOG} [NHK World]`;
 

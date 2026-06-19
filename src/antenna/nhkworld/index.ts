@@ -1,7 +1,7 @@
 // TODO: Validate
-import { initAntennaPlugin } from "../antenna_plugin";
+import { initAntennaPlugin } from "../../antenna_plugin";
 
-export { hostnames, matches } from "./nhkworld.matches.cjs";
+export { hostnames, matches } from "./matches.cjs";
 
 // NHK World show pages look like /nhkworld/en/shows/100years-midosuji/ where the
 // trailing segment is a slug, while individual episode/video pages use an
@@ -15,12 +15,10 @@ const SLUG_RE = /\/shows\/([^/]+)\/?$/;
 
 export function init(): void {
   initAntennaPlugin({
-    name: "NHK World",
-    brandColor: "#00a0c6",
-    pathFilter: SHOW_PATH_RE,
+    website_name: "NHK World",
+    buttonColor: "#00a0c6",
+    urlRegex: SHOW_PATH_RE,
     waitSelector: ".pProgramHero__main",
-    findAnchor: () =>
-      document.querySelector<HTMLElement>(".pProgramHero__main"),
     getCurrentUrl: () => location.href,
     getMatchKey: (url) => url.match(SLUG_RE)?.[1] ?? null,
   });
