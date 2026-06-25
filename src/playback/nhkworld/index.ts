@@ -1,7 +1,7 @@
 // TODO: Validate
 import {
   REMOTE_LOG,
-  createStopButton,
+  mountPlayerControls,
   signalEpisodeEnded,
   sleep,
   waitForElement,
@@ -11,14 +11,9 @@ export { hostnames, matches } from "./matches.cjs";
 
 const LOG = `${REMOTE_LOG} [NHK World]`;
 
-// NHK World renders the actual video.js player inside a same-origin iframe, so
-// the player controls (.vjs-*) live in the iframe's document rather than the
-// top-level show page.
-const PLAYER_IFRAME_SELECTOR = 'iframe[src*="world-player"]';
-
 function getPlayerDocument(): Document | null {
   const iframe = document.querySelector<HTMLIFrameElement>(
-    PLAYER_IFRAME_SELECTOR,
+    'iframe[src*="world-player"]',
   );
   return iframe?.contentDocument ?? null;
 }
@@ -145,15 +140,28 @@ async function watchForCompletion(): Promise<void> {
   });
 }
 
+// Add the overlay controls, wiring NHK's fake fullscreen (a class on the player
+// iframe element, which lives in the top page) into the shared component.
+async function mountControls(): Promise<void> {
+  const iframe = await waitForElement<HTMLElement>(".world-player-iframe");
+  mountPlayerControls({
+    log: LOG,
+    isExpanded: () => iframe.classList.contains("world-player-fullscreen"),
+    toggleExpand: () => {
+      iframe.classList.toggle("world-player-fullscreen");
+    },
+    expandObserveTarget: iframe,
+  });
+}
+
 export async function init(): Promise<void> {
   // Only run the script if the tab was opened by Stream Channeler Remote.
   const loading = GM_getValue("loadingTab", false);
   if (!loading) return;
   GM_setValue("loadingTab", false);
 
-  createStopButton();
-
   await startVideo();
   await fullscreenVideo();
+  await mountControls();
   await watchForCompletion();
 }

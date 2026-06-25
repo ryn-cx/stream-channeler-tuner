@@ -145,6 +145,12 @@ function toggleRemote(): void {
 }
 
 export function initPlayback(): void {
+  // A video tab's "Stop Auto Control" button sets this; stop the remote so the
+  // Start/Stop Remote button reflects it.
+  GM_addValueChangeListener("remoteStopRequested", () => {
+    if (running) stopRemote();
+  });
+
   function syncState(): void {
     const newCards = Array.from(
       document.querySelectorAll<HTMLElement>('[data-slot="card"]'),
