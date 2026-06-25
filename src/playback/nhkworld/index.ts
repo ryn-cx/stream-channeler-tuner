@@ -2,7 +2,6 @@
 import {
   REMOTE_LOG,
   createStopButton,
-  requestFullscreenOnDoubleClick,
   signalEpisodeEnded,
   sleep,
   waitForElement,
@@ -109,32 +108,15 @@ async function startVideo(): Promise<void> {
   console.log(`${LOG} Playback confirmed`);
 }
 
-// Detect whether the player is fullscreen. When the iframe enters fullscreen the
-// top document exposes it via document.fullscreenElement, and video.js adds the
-// "vjs-fullscreen" class inside the iframe.
-function isFullscreen(): boolean {
-  if (document.fullscreenElement !== null) return true;
-  return getPlayerDocument()?.querySelector(".video-js.vjs-fullscreen") != null;
-}
-
-// Wait for the player to mount, then let the user double-click to enter
-// fullscreen. The fullscreen control lives inside the same-origin player iframe,
-// so the iframe's document is added as a gesture target (a click on the video
-// itself counts) and the button is re-queried from it on each gesture.
+// Real fullscreen needs a user gesture, which an automated tab doesn't have.
+// Instead, fake it: NHK's own stylesheet pins
+// ".world-player-iframe.world-player-fullscreen" to cover the whole viewport
+// (position:fixed, 100vw/100dvh, z-index:9999) and hides body overflow, so just
+// add that class to the player iframe. No Fullscreen API, no gesture needed.
 async function fullscreenVideo(): Promise<void> {
-  await waitForPlayerElement<HTMLElement>(".vjs-fullscreen-control");
-  requestFullscreenOnDoubleClick({
-    log: LOG,
-    isFullscreen,
-    getButton: () =>
-      getPlayerDocument()?.querySelector<HTMLElement>(
-        ".vjs-fullscreen-control",
-      ) ?? null,
-    gestureTargets: () => {
-      const doc = getPlayerDocument();
-      return doc ? [doc] : [];
-    },
-  });
+  const iframe = await waitForElement<HTMLElement>(".world-player-iframe");
+  iframe.classList.add("world-player-fullscreen");
+  console.log(`${LOG} Player expanded to cover the page`);
 }
 
 // Watch the play control inside the iframe for the "Replay" state, which signals

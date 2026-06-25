@@ -42,23 +42,41 @@ let autoControlStopped = false;
 // A small button pinned to a corner of every remote-opened tab so the user can
 // cancel automatic control of the current video. Styled to match the Manage
 // "Add to Channel" widget. Placed bottom-left to avoid overlapping the Manage
-// footer, which sits bottom-right.
+// footer, which sits bottom-right. Hidden by default and revealed when the user
+// moves the cursor (like a video player's controls), then auto-hides after a
+// short idle period so it doesn't sit over the video.
+const STOP_BUTTON_HIDE_DELAY_MS = 3000;
 export function createStopButton(): void {
   if (document.getElementById("stream-channeler-stop-btn")) return;
 
+  let stopped = false;
   const button = document.createElement("button");
   button.id = "stream-channeler-stop-btn";
   button.textContent = "Stop Auto Control";
   button.style.cssText =
-    "position:fixed;bottom:16px;left:16px;z-index:2147483647;padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:#c0392b;color:#fff;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.5);";
+    "position:fixed;bottom:16px;left:16px;z-index:2147483647;padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:#c0392b;color:#fff;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;pointer-events:none;transition:opacity 0.2s ease;";
 
   button.addEventListener("click", () => {
+    stopped = true;
     autoControlStopped = true;
     console.log(`${REMOTE_LOG} Automatic control stopped by user`);
     button.textContent = "Auto Control Stopped";
     button.disabled = true;
     button.style.opacity = "0.6";
     button.style.cursor = "default";
+  });
+
+  // Reveal on cursor movement, then fade back out once the cursor is idle.
+  let hideTimer: number;
+  document.addEventListener("mousemove", () => {
+    if (stopped) return;
+    button.style.opacity = "1";
+    button.style.pointerEvents = "auto";
+    clearTimeout(hideTimer);
+    hideTimer = window.setTimeout(() => {
+      button.style.opacity = "0";
+      button.style.pointerEvents = "none";
+    }, STOP_BUTTON_HIDE_DELAY_MS);
   });
 
   document.body.appendChild(button);
