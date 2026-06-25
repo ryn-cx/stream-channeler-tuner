@@ -567,7 +567,7 @@ __webpack_require__.r(__webpack_exports__);
 
 const LOG = `${_shared__WEBPACK_IMPORTED_MODULE_0__/* .CONTROLLER_LOG */ .c9} [HBO Max]`;
 // TODO: This code is completely untested it might work.
-async function startEpisode() {
+async function startVideo() {
     const season = GM_getValue("seasonNumber", null);
     const episode = GM_getValue("episodeNumber", null);
     if (season === null || episode === null) {
@@ -622,7 +622,7 @@ function init() {
     }
     // Sometimes JustWatch uses a URL that just links to the show instead of the specific
     // episodes so the episode needs to be started manually.
-    startEpisode();
+    startVideo();
 }
 
 
@@ -747,23 +747,106 @@ __webpack_require__.r(__webpack_exports__);
 
 
 const LOG = `${_shared__WEBPACK_IMPORTED_MODULE_0__/* .CONTROLLER_LOG */ .c9} [NHK World]`;
-// NHK World embeds a video.js player. The play/pause control's text and title
-// flip to "Replay" once the video finishes, which is how we detect completion.
+// NHK World renders the actual video.js player inside a same-origin iframe, so
+// the player controls (.vjs-*) live in the iframe's document rather than the
+// top-level show page.
+const PLAYER_IFRAME_SELECTOR = 'iframe[src*="world-player"]';
+function getPlayerDocument() {
+    const iframe = document.querySelector(PLAYER_IFRAME_SELECTOR);
+    return iframe?.contentDocument ?? null;
+}
+// Like waitForElement, but searches inside the player iframe's document. The
+// iframe element and its document are re-read on every poll because the document
+// is replaced as the iframe navigates to the player.
+async function waitForPlayerElement(selector, timeoutMs = 15000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const element = getPlayerDocument()?.querySelector(selector) ?? null;
+        if (element)
+            return element;
+        await (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .sleep */ .yy)(250);
+    }
+    throw new Error(`${LOG} Timed out waiting for "${selector}" in player iframe`);
+}
+// The play/pause control's text and title flip to "Replay" once the video
+// finishes, which is how we detect completion.
 function isReplay(button) {
     if (button.getAttribute("title") === "Replay")
         return true;
     const text = button.querySelector(".vjs-control-text")?.textContent?.trim();
     return text === "Replay";
 }
-async function init() {
-    // Only run the script if the tab was opened by Stream Channeler Controller.
-    const loading = GM_getValue("loadingTab", false);
-    if (!loading)
-        return;
-    GM_setValue("loadingTab", false);
-    // The play control is injected by video.js after the page loads, so wait for
-    // it before watching for the "Replay" state.
-    const button = await (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .waitForElement */ .xk)(".vjs-play-control");
+// Whether the video has started playing. NHK removes the "Watch Now" overlay
+// (.tVideoEpisodePlayer__watchNow, which holds the WATCH NOW button) from the
+// top page once playback begins, leaving just the playing iframe. That overlay's
+// disappearance is the most reliable signal because it lives in the top
+// document, unlike the player's <video> which is buried in the iframe.
+function isPlaying() {
+    const overlay = document.querySelector(".tVideoEpisodePlayer__watchNow");
+    if (overlay === null || overlay.offsetParent === null)
+        return true;
+    // Fallback: the <video> inside the iframe reports active playback.
+    const video = getPlayerDocument()?.querySelector("video.vjs-tech");
+    return (video != null && !video.paused && !video.ended && video.readyState >= 2);
+}
+// NHK World does not autoplay — the video.js player is only mounted once the
+// user clicks "Watch Now". The button lives in the top-level show page (not the
+// iframe), and the click can land before the player is ready, so keep nudging
+// whichever start control is available until playback actually begins.
+async function startVideo() {
+    const watchNow = await (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .waitForElement */ .xk)(".tVideoEpisodePlayer__watchNowBtn");
+    console.log(`${LOG} Watch Now button found, starting playback`);
+    watchNow.click();
+    let attempt = 0;
+    while (!isPlaying()) {
+        await (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .sleep */ .yy)(1000);
+        if (isPlaying())
+            break;
+        attempt++;
+        // The "Watch Now" button lives in the top page; once the player is mounted
+        // it exposes its own big play button inside the iframe. Click whichever is
+        // currently available to retry.
+        const trigger = document.querySelector(".tVideoEpisodePlayer__watchNowBtn") ??
+            getPlayerDocument()?.querySelector(".vjs-big-play-button") ??
+            null;
+        if (trigger) {
+            console.log(`${LOG} Not playing yet, retrying start (attempt ${attempt})`);
+            trigger.click();
+        }
+        else {
+            console.log(`${LOG} Not playing yet, no start control available (attempt ${attempt})`);
+        }
+    }
+    console.log(`${LOG} Playback confirmed`);
+}
+// Detect whether the player is fullscreen. When the iframe enters fullscreen the
+// top document exposes it via document.fullscreenElement, and video.js adds the
+// "vjs-fullscreen" class inside the iframe.
+function isFullscreen() {
+    if (document.fullscreenElement !== null)
+        return true;
+    return getPlayerDocument()?.querySelector(".video-js.vjs-fullscreen") != null;
+}
+// Wait for the player to mount, then let the user double-click to enter
+// fullscreen. The fullscreen control lives inside the same-origin player iframe,
+// so the iframe's document is added as a gesture target (a click on the video
+// itself counts) and the button is re-queried from it on each gesture.
+async function fullscreenVideo() {
+    await waitForPlayerElement(".vjs-fullscreen-control");
+    (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .requestFullscreenOnDoubleClick */ .Ph)({
+        log: LOG,
+        isFullscreen,
+        getButton: () => getPlayerDocument()?.querySelector(".vjs-fullscreen-control") ?? null,
+        gestureTargets: () => {
+            const doc = getPlayerDocument();
+            return doc ? [doc] : [];
+        },
+    });
+}
+// Watch the play control inside the iframe for the "Replay" state, which signals
+// completion.
+async function watchForCompletion() {
+    const button = await waitForPlayerElement(".vjs-play-control");
     console.log(`${LOG} Play control found, watching for completion`);
     if (isReplay(button)) {
         (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .signalEpisodeEnded */ .e$)();
@@ -782,6 +865,17 @@ async function init() {
         subtree: true,
         characterData: true,
     });
+}
+async function init() {
+    // Only run the script if the tab was opened by Stream Channeler Controller.
+    const loading = GM_getValue("loadingTab", false);
+    if (!loading)
+        return;
+    GM_setValue("loadingTab", false);
+    (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .createStopButton */ .Dv)();
+    await startVideo();
+    await fullscreenVideo();
+    await watchForCompletion();
 }
 
 
@@ -804,35 +898,37 @@ __webpack_require__.r(__webpack_exports__);
 
 const LOG = `${_shared__WEBPACK_IMPORTED_MODULE_0__/* .CONTROLLER_LOG */ .c9} [YouTube]`;
 
+// YouTube autoplays, so just let the user double-click to enter fullscreen.
+function fullscreenVideo() {
+    (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .requestFullscreenOnDoubleClick */ .Ph)({
+        log: LOG,
+        isFullscreen: () => document.fullscreenElement !== null,
+        getButton: () => document.querySelector(".ytp-fullscreen-button"),
+    });
+}
+// The player gains the "ended-mode" class once the video finishes, which is
+// how we detect completion.
+function watchForCompletion(player) {
+    const observer = new MutationObserver(() => {
+        if (player.classList.contains("ended-mode")) {
+            observer.disconnect();
+            (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .signalEpisodeEnded */ .e$)();
+        }
+    });
+    observer.observe(player, { attributes: true, attributeFilter: ["class"] });
+}
 function init() {
     // Only run the script if the tab was opened by Stream Channeler Controller.
     const loading = GM_getValue("loadingTab", false);
     if (!loading)
         return;
     GM_setValue("loadingTab", false);
+    (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .createStopButton */ .Dv)();
     const player = document.getElementById("movie_player");
     if (!player)
         throw new Error(`${LOG} movie_player element not found on YouTube watch page`);
-    let started = false;
-    const observer = new MutationObserver(() => {
-        if (!started && player.classList.contains("playing-mode")) {
-            started = true;
-            // TODO: This doesn't work.
-            document.dispatchEvent(new KeyboardEvent("keydown", {
-                key: "f",
-                code: "KeyF",
-                keyCode: 70,
-                which: 70,
-                bubbles: true,
-                cancelable: true,
-            }));
-        }
-        else if (started && player.classList.contains("ended-mode")) {
-            observer.disconnect();
-            (0,_shared__WEBPACK_IMPORTED_MODULE_0__/* .signalEpisodeEnded */ .e$)();
-        }
-    });
-    observer.observe(player, { attributes: true, attributeFilter: ["class"] });
+    fullscreenVideo();
+    watchForCompletion(player);
 }
 
 
@@ -843,12 +939,14 @@ function init() {
 
 "use strict";
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Dv: () => (/* binding */ createStopButton),
 /* harmony export */   F5: () => (/* binding */ initUrlChangePlugin),
+/* harmony export */   Ph: () => (/* binding */ requestFullscreenOnDoubleClick),
 /* harmony export */   c9: () => (/* binding */ CONTROLLER_LOG),
 /* harmony export */   e$: () => (/* binding */ signalEpisodeEnded),
-/* harmony export */   xk: () => (/* binding */ waitForElement)
+/* harmony export */   xk: () => (/* binding */ waitForElement),
+/* harmony export */   yy: () => (/* binding */ sleep)
 /* harmony export */ });
-/* unused harmony export sleep */
 // TODO: Validate
 const CONTROLLER_LOG = "[Stream Channeler Controller]";
 function sleep(ms) {
@@ -876,7 +974,98 @@ function waitForElement(selector, timeoutMs = 15000) {
         }, timeoutMs);
     });
 }
+// When the user stops automatic control on a video tab, the page should stay
+// open and never advance the channel. Gating signalEpisodeEnded() is enough
+// because it is the single choke point that signals completion and closes the
+// tab, regardless of which plugin detected the end.
+let autoControlStopped = false;
+// A small button pinned to a corner of every controller-opened tab so the user
+// can cancel automatic control of the current video. Styled to match the
+// Antenna "Add to Channel" widget. Placed bottom-left to avoid overlapping the
+// Antenna footer, which sits bottom-right.
+function createStopButton() {
+    if (document.getElementById("stream-channeler-stop-btn"))
+        return;
+    const button = document.createElement("button");
+    button.id = "stream-channeler-stop-btn";
+    button.textContent = "Stop Auto Control";
+    button.style.cssText =
+        "position:fixed;bottom:16px;left:16px;z-index:2147483647;padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:#c0392b;color:#fff;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.5);";
+    button.addEventListener("click", () => {
+        autoControlStopped = true;
+        console.log(`${CONTROLLER_LOG} Automatic control stopped by user`);
+        button.textContent = "Auto Control Stopped";
+        button.disabled = true;
+        button.style.opacity = "0.6";
+        button.style.cursor = "default";
+    });
+    document.body.appendChild(button);
+}
+// A big, bright banner prompting the user to double-click so a plugin can enter
+// fullscreen. Spans the top of the screen and absorbs pointer events so
+// double-clicking it can't reach (and accidentally activate) the controls
+// behind it. Returns a function that removes it.
+function showFullscreenPrompt() {
+    const banner = document.createElement("div");
+    banner.id = "stream-channeler-fullscreen-prompt";
+    banner.textContent = "Double-click here to fullscreen the video";
+    banner.style.cssText =
+        "position:fixed;top:0;left:0;right:0;z-index:2147483647;padding:24px 16px;background:#e60019;color:#fff;font-family:system-ui,sans-serif;font-size:28px;font-weight:800;text-align:center;letter-spacing:0.5px;box-shadow:0 4px 16px rgba(0,0,0,0.5);cursor:pointer;";
+    document.body.appendChild(banner);
+    return () => banner.remove();
+}
+/**
+ * Enter fullscreen by clicking a player's fullscreen control. Browsers only
+ * allow requestFullscreen() during a transient user activation, so a scripted
+ * click is silently refused — fullscreen can only be triggered from the user's
+ * own gesture. This shows a prompt and, on the next double-click anywhere,
+ * clicks the fullscreen button synchronously inside the gesture handler (which
+ * carries the activation), then cleans up once fullscreen engages.
+ *
+ * @param config.isFullscreen Whether the player is currently fullscreen.
+ * @param config.getButton Returns the fullscreen control to click (re-queried
+ *   on each gesture so it survives DOM churn). Return null if not yet present.
+ * @param config.gestureTargets Extra documents to listen on besides the top
+ *   document — e.g. a same-origin player iframe whose own clicks must count.
+ * @param config.log Log prefix for diagnostics.
+ */
+function requestFullscreenOnDoubleClick(config) {
+    if (config.isFullscreen())
+        return;
+    const log = config.log ?? CONTROLLER_LOG;
+    console.log(`${log} Fullscreen requires a user gesture — double-click to enter fullscreen`);
+    const removePrompt = showFullscreenPrompt();
+    const options = { capture: true };
+    const targets = [document, ...(config.gestureTargets?.() ?? [])];
+    const onGesture = () => {
+        if (config.isFullscreen())
+            return;
+        const button = config.getButton();
+        if (button) {
+            console.log(`${log} Double-click detected, requesting fullscreen`);
+            button.click();
+        }
+    };
+    const cleanup = () => {
+        if (!config.isFullscreen())
+            return;
+        console.log(`${log} Fullscreen confirmed, removing prompt and listeners`);
+        removePrompt();
+        for (const target of targets) {
+            target.removeEventListener("dblclick", onGesture, options);
+        }
+        document.removeEventListener("fullscreenchange", cleanup);
+    };
+    for (const target of targets) {
+        target.addEventListener("dblclick", onGesture, options);
+    }
+    document.addEventListener("fullscreenchange", cleanup);
+}
 function signalEpisodeEnded() {
+    if (autoControlStopped) {
+        console.log(`${CONTROLLER_LOG} Episode ended but automatic control is stopped — staying on tab`);
+        return;
+    }
     console.log(`${CONTROLLER_LOG} Episode ended, closing tab`);
     const now = Date.now();
     const current = GM_getValue("videoEnded", 0);
@@ -904,6 +1093,7 @@ function initUrlChangePlugin(name) {
     if (!loading)
         return;
     GM_setValue("loadingTab", false);
+    createStopButton();
     // Sites may redirect the URL immediately on load, so wait before
     // capturing the URL to avoid a false positive.
     const SETTLE_DELAY_MS = 5000;
