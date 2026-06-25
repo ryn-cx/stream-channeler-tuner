@@ -2,7 +2,7 @@
 
 A companion UserScript for [Stream Channeler](https://streamchanneler.com) that adds two features:
 
-- **Controller** - Automatically plays through episodes in a channel sequentially, detecting when each episode ends and advancing to the next one. Supports YouTube, Crunchyroll, HBO Max, and Netflix.
+- **Controller** - Automatically plays through episodes in a channel sequentially, detecting when each episode ends and advancing to the next one. Supports YouTube, NHK World, Crunchyroll, HBO Max, and Netflix.
 - **Antenna** - Assists in building channels by letting you queue shows from [JustWatch](https://www.justwatch.com) and bulk import them into Stream Channeler.
 
 ## Install
@@ -14,12 +14,15 @@ A companion UserScript for [Stream Channeler](https://streamchanneler.com) that 
 
 ### Controller (auto-play episodes)
 
-| Site | Detection Method |
-|------|-----------------|
-| YouTube | Class change on player element |
-| Crunchyroll | URL change |
-| HBO Max | URL change |
-| Netflix | URL change |
+| Site | Autoplay | Fullscreen |
+|------|----------|------------|
+| YouTube | ✅ | ✅ |
+| NHK World | ✅ | ✅ |
+| Crunchyroll | ✅ | ❌ |
+| HBO Max | ✅ | ❌ |
+| Netflix | ✅ | ❌ |
+
+> **Fullscreen requires a double-click on the page.** Web browsers only allow a page to enter fullscreen in response to a real user interaction, so it cannot be triggered automatically for security reasons. On supported sites the script shows a banner prompting you to **double-click to fullscreen the video**, and enters fullscreen from that click.
 
 ### Antenna (queue shows)
 
