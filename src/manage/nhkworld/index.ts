@@ -1,5 +1,5 @@
 // TODO: Validate
-import { initAntennaPlugin } from "../../antenna_plugin";
+import { initManagePlugin } from "../../manage_plugin";
 
 export { hostnames, matches } from "./matches.cjs";
 
@@ -14,7 +14,7 @@ const SHOW_PATH_RE = /^\/nhkworld\/en\/shows\/(?!\d+\/?$)[^/]+\/?$/;
 const SLUG_RE = /\/shows\/([^/]+)\/?$/;
 
 export function init(): void {
-  initAntennaPlugin({
+  initManagePlugin({
     website_name: "NHK World",
     buttonColor: "#00a0c6",
     urlRegex: SHOW_PATH_RE,

@@ -1,5 +1,5 @@
 // TODO: Validate
-const LOG = "[Stream Channeler Antenna]";
+const LOG = "[Stream Channeler Remote]";
 
 // https://lucide.dev/icons/radio-tower
 const LOAD_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-radio-tower"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"/><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"/><path d="M16.2 4.7a6.14 6.14 0 0 1 .8 7.5"/><path d="M19.1 1.9a10.14 10.14 0 0 1 0 14.2"/><path d="M9.56 14l-2.35 8.68"/><path d="M14.44 14l2.35 8.68"/><circle cx="12" cy="12" r="2"/></svg>`;
@@ -7,7 +7,7 @@ const LOAD_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height
 // https://lucide.dev/icons/antenna
 const INSERT_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-antenna-icon lucide-antenna"><path d="M2 12 7 2"/><path d="m7 12 5-10"/><path d="m12 12 5-10"/><path d="m17 12 5-10"/><path d="M4.5 7h15"/><path d="M12 16v6"/></svg>`;
 
-export interface AntennaChannels {
+export interface ManagedChannels {
   [channelId: string]: { name: string; urls: string[]; showUrls: string[] };
 }
 
@@ -15,11 +15,11 @@ interface ChannelShowsResponse {
   shows: { url: string }[];
 }
 
-export function getChannelQueues(): AntennaChannels {
-  return GM_getValue("antennaChannels", {}) as AntennaChannels;
+export function getChannelQueues(): ManagedChannels {
+  return GM_getValue("antennaChannels", {}) as ManagedChannels;
 }
 
-export function setChannelQueues(channels: AntennaChannels): void {
+export function setChannelQueues(channels: ManagedChannels): void {
   GM_setValue("antennaChannels", channels);
 }
 
@@ -60,13 +60,13 @@ async function loadBlankChannels(): Promise<void> {
   // they have been imported.
   if (hasExisting) {
     const confirmed = confirm(
-      "This will replace all existing antenna channel data (including queued URLs). Continue?",
+      "This will replace all existing channel data (including queued URLs). Continue?",
     );
     if (!confirmed) return;
   }
 
   // Get all of the channels from the page's html.
-  const channels: AntennaChannels = {};
+  const channels: ManagedChannels = {};
   const links = document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="/channels/"]',
   );
@@ -92,7 +92,7 @@ async function loadBlankChannels(): Promise<void> {
 
   setChannelQueues(channels);
   alert(
-    `Loaded ${ids.length} channels (${totalShows} shows) into stream channeler antenna.`,
+    `Loaded ${ids.length} channels (${totalShows} shows) into Stream Channeler Remote.`,
   );
 }
 
@@ -121,14 +121,14 @@ function pasteQueue(): void {
 function addButtonsToModal(dialog: Element): void {
   const modalFooter = dialog.querySelector('[data-slot="dialog-footer"]');
   if (!modalFooter) return;
-  if (modalFooter.querySelector("#antenna-load-btn")) return;
+  if (modalFooter.querySelector("#manage-load-btn")) return;
 
   const existingBtn = modalFooter.querySelector("button");
   if (!existingBtn) throw new Error(`${LOG} No button found in dialog footer`);
   const btnClass = existingBtn.className;
 
   const loadBtn = document.createElement("button");
-  loadBtn.id = "antenna-load-btn";
+  loadBtn.id = "manage-load-btn";
   loadBtn.className = btnClass;
   loadBtn.setAttribute("data-slot", "button");
   loadBtn.innerHTML = `${INSERT_ICON_SVG}Load Channels`;
@@ -138,7 +138,7 @@ function addButtonsToModal(dialog: Element): void {
   });
 
   const insertBtn = document.createElement("button");
-  insertBtn.id = "antenna-insert-btn";
+  insertBtn.id = "manage-insert-btn";
   insertBtn.className = btnClass;
   insertBtn.setAttribute("data-slot", "button");
   insertBtn.innerHTML = `${LOAD_ICON_SVG}Insert URLs`;
@@ -151,7 +151,7 @@ function addButtonsToModal(dialog: Element): void {
   modalFooter.insertBefore(loadBtn, modalFooter.firstChild);
 }
 
-export function initAntenna(): void {
+export function initManage(): void {
   if (location.pathname !== "/channels") return;
 
   console.log(`${LOG} Watching for bulk import modal`);

@@ -1,12 +1,12 @@
 // TODO: Validate
 import {
-  CONTROLLER_LOG,
+  REMOTE_LOG,
   createStopButton,
   requestFullscreenOnDoubleClick,
   signalEpisodeEnded,
 } from "../../shared";
 
-const LOG = `${CONTROLLER_LOG} [YouTube]`;
+const LOG = `${REMOTE_LOG} [YouTube]`;
 
 export { hostnames, matches } from "./matches.cjs";
 
@@ -33,7 +33,7 @@ function watchForCompletion(player: HTMLElement): void {
 }
 
 export function init(): void {
-  // Only run the script if the tab was opened by Stream Channeler Controller.
+  // Only run the script if the tab was opened by Stream Channeler Remote.
   const loading = GM_getValue("loadingTab", false);
   if (!loading) return;
   GM_setValue("loadingTab", false);

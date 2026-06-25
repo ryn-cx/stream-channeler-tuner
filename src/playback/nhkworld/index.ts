@@ -1,6 +1,6 @@
 // TODO: Validate
 import {
-  CONTROLLER_LOG,
+  REMOTE_LOG,
   createStopButton,
   requestFullscreenOnDoubleClick,
   signalEpisodeEnded,
@@ -10,7 +10,7 @@ import {
 
 export { hostnames, matches } from "./matches.cjs";
 
-const LOG = `${CONTROLLER_LOG} [NHK World]`;
+const LOG = `${REMOTE_LOG} [NHK World]`;
 
 // NHK World renders the actual video.js player inside a same-origin iframe, so
 // the player controls (.vjs-*) live in the iframe's document rather than the
@@ -164,7 +164,7 @@ async function watchForCompletion(): Promise<void> {
 }
 
 export async function init(): Promise<void> {
-  // Only run the script if the tab was opened by Stream Channeler Controller.
+  // Only run the script if the tab was opened by Stream Channeler Remote.
   const loading = GM_getValue("loadingTab", false);
   if (!loading) return;
   GM_setValue("loadingTab", false);

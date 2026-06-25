@@ -1,44 +1,39 @@
-# Stream Channeler Tuner
+# Stream Channeler Remote
 
 A companion UserScript for [Stream Channeler](https://streamchanneler.com) that adds two features:
 
-- **Controller** - Automatically plays through episodes in a channel sequentially, detecting when each episode ends and advancing to the next one. Supports YouTube, NHK World, Crunchyroll, HBO Max, and Netflix.
-- **Antenna** - Assists in building channels by letting you queue shows from [JustWatch](https://www.justwatch.com) and bulk import them into Stream Channeler.
+- **Playback** - Automatically plays through episodes in a channel sequentially, detecting when each episode ends and advancing to the next one. Supports YouTube, NHK World, Crunchyroll, HBO Max, and Netflix.
+- **Manage** - Assists in building channels by letting you queue shows from JustWatch, Crunchyroll, NHK World, and YouTube, then bulk import them into Stream Channeler.
 
 ## Install
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) or a similar userscript manager.
-2. Install [Stream Channeler Tuner](https://ryn-cx.github.io/stream-channeler-tuner/index.prod.user.js).
+2. Install [Stream Channeler Remote](https://ryn-cx.github.io/stream-channeler-tuner/index.prod.user.js).
 
 ## Supported Sites
 
-### Controller (auto-play episodes)
+**Autoplay** and **Fullscreen** are Playback features (auto-play through episodes); **Add to Channel** is the Manage feature (queue shows for bulk import).
 
-| Site | Autoplay | Fullscreen |
-|------|----------|------------|
-| YouTube | ✅ | ✅ |
-| NHK World | ✅ | ✅ |
-| Crunchyroll | ✅ | ❌ |
-| HBO Max | ✅ | ❌ |
-| Netflix | ✅ | ❌ |
+| Site | Autoplay | Fullscreen | Add to Channel |
+|------|----------|------------|----------------|
+| YouTube | ✅ | ✅ | ✅ |
+| NHK World | ✅ | ✅ | ✅ |
+| Crunchyroll | ✅ | ❌ | ✅ |
+| HBO Max | ✅ | ❌ | ❌ |
+| Netflix | ✅ | ❌ | ❌ |
+| JustWatch | N/A | N/A | ✅ |
 
 > **Fullscreen requires a double-click on the page.** Web browsers only allow a page to enter fullscreen in response to a real user interaction, so it cannot be triggered automatically for security reasons. On supported sites the script shows a banner prompting you to **double-click to fullscreen the video**, and enters fullscreen from that click.
 
-### Antenna (queue shows)
-
-| Site | Action |
-|------|--------|
-| JustWatch | Add to Channel button on show pages |
-
 ## Usage
 
-### Controller
+### Playback
 
 1. Go to a channel on [streamchanneler.com](https://streamchanneler.com)
-2. Click **Start Remote Controller**
+2. Click **Start Remote**
 3. Episodes will open, play, and advance automatically
 
-### Antenna
+### Manage
 
 1. Go to the [channels page](https://streamchanneler.com/channels) and open the **Bulk Import** modal
 2. Click **Load Channels** to load your channel list
@@ -54,13 +49,13 @@ npm run build
 
 ## Adding Plugins
 
-Plugins are auto-discovered from `src/controller_plugins/` and `src/antenna_plugins/`. To add support for a new site, create two files:
+Plugins are auto-discovered from `src/playback/` and `src/manage/`. Each plugin lives in its own per-site folder containing an `index.ts` and a `matches.cjs`.
 
-### Controller Plugin (auto-play episodes)
+### Playback Plugin (auto-play episodes)
 
-A controller plugin detects when an episode ends on a streaming site and signals back to Stream Channeler.
+A playback plugin detects when an episode ends on a streaming site and signals back to Stream Channeler.
 
-**`src/controller_plugins/example.matches.cjs`**
+**`src/playback/example/matches.cjs`**
 ```js
 module.exports = {
   hostnames: ["example.com"],
@@ -68,11 +63,11 @@ module.exports = {
 };
 ```
 
-**`src/controller_plugins/example.ts`**
+**`src/playback/example/index.ts`**
 ```ts
-import { initUrlChangePlugin } from "../shared";
+import { initUrlChangePlugin } from "../../shared";
 
-export { hostnames, matches } from "./example.matches.cjs";
+export { hostnames, matches } from "./matches.cjs";
 
 export function init(): void {
   const loading = GM_getValue("loadingTab", false);
@@ -82,15 +77,15 @@ export function init(): void {
   // For sites where episode end is detected by URL change, use the shared helper:
   initUrlChangePlugin("Example");
 
-  // For custom detection, use signalEpisodeEnded() from "../shared" when the episode ends.
+  // For custom detection, use signalEpisodeEnded() from "../../shared" when the episode ends.
 }
 ```
 
-### Antenna Plugin (queue shows)
+### Manage Plugin (queue shows)
 
-An antenna plugin adds an "Add to Channel" button on a content discovery site.
+A manage plugin adds an "Add to Channel" button on a content discovery site.
 
-**`src/antenna_plugins/example.matches.cjs`**
+**`src/manage/example/matches.cjs`**
 ```js
 module.exports = {
   hostnames: ["example.com"],
@@ -98,23 +93,30 @@ module.exports = {
 };
 ```
 
-**`src/antenna_plugins/example.ts`**
+**`src/manage/example/index.ts`**
 ```ts
-import { getChannelQueues, setChannelQueues } from "../antenna";
+import { initManagePlugin } from "../../manage_plugin";
 
-export { hostnames, matches } from "./example.matches.cjs";
+export { hostnames, matches } from "./matches.cjs";
 
 export function init(): void {
-  // Add UI elements to the page that let the user select a channel
-  // and queue the current URL using getChannelQueues/setChannelQueues.
+  // Render the "Add to Channel" footer that lets the user pick a channel
+  // and queue the current page's URL.
+  initManagePlugin({
+    website_name: "Example",
+    buttonColor: "#000000",
+    waitSelector: "h1",
+    getCurrentUrl: () => location.href,
+    getMatchKey: (url) => url,
+  });
 }
 ```
 
 ### Notes
 
-- The `.matches.cjs` file defines which URLs the script runs on. It is shared between the TypeScript plugin (runtime) and the build config (metadata generation).
+- The `matches.cjs` file defines which URLs the script runs on. It is shared between the TypeScript plugin (runtime) and the build config (metadata generation).
 - No changes to `index.ts` or `metadata.cjs` are needed — new plugins are picked up automatically.
-- Controller plugins should check `GM_getValue("loadingTab", false)` and exit early if false, to avoid running on tabs not opened by Stream Channeler.
-- Use `signalEpisodeEnded()` from `shared.ts` to notify the controller that an episode has finished.
+- Playback plugins should check `GM_getValue("loadingTab", false)` and exit early if false, to avoid running on tabs not opened by Stream Channeler.
+- Use `signalEpisodeEnded()` from `shared.ts` to notify Stream Channeler that an episode has finished.
 
-For more details, check out the existing plugins: [YouTube (controller)](src/controller_plugins/youtube.ts) and [JustWatch (antenna)](src/antenna_plugins/justwatch.ts).
+For more details, check out the existing plugins: [YouTube (playback)](src/playback/youtube/index.ts) and [JustWatch (manage)](src/manage/justwatch/index.ts).

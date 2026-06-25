@@ -1,5 +1,5 @@
 // TODO: Validate
-import { initAntennaPlugin } from "../../antenna_plugin";
+import { initManagePlugin } from "../../manage_plugin";
 
 export { hostnames, matches } from "./matches.cjs";
 
@@ -30,7 +30,7 @@ function getCurrentChannelId(): string | null {
 }
 
 export function init(): void {
-  initAntennaPlugin({
+  initManagePlugin({
     website_name: "YouTube",
     buttonColor: "#ff0000",
     urlRegex: /^\/(@|channel\/|c\/|user\/)/,

@@ -4,7 +4,7 @@ const path = require("node:path");
 const { author, version, repository, description } = require("../package.json");
 
 // Dynamically load all of the plugins and get the domains they support. Plugins
-// live in per-website folders (e.g. src/antenna/youtube/matches.cjs), so walk
+// live in per-website folders (e.g. src/manage/youtube/matches.cjs), so walk
 // the tree to collect every matches.cjs.
 function readMatches(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -15,12 +15,12 @@ function readMatches(dir) {
   });
 }
 const pluginMatches = [...new Set([
-  ...readMatches(path.resolve(__dirname, "../src/controller")),
-  ...readMatches(path.resolve(__dirname, "../src/antenna")),
+  ...readMatches(path.resolve(__dirname, "../src/playback")),
+  ...readMatches(path.resolve(__dirname, "../src/manage")),
 ])];
 
 module.exports = {
-  name: "Stream Channeler Tuner",
+  name: "Stream Channeler Remote",
   namespace: "https://streamchanneler.com/",
   version: version,
   author: author,

@@ -1,13 +1,9 @@
 // TODO: Validate
-import {
-  CONTROLLER_LOG,
-  initUrlChangePlugin,
-  waitForElement,
-} from "../../shared";
+import { REMOTE_LOG, initUrlChangePlugin, waitForElement } from "../../shared";
 
 export { hostnames, matches } from "./matches.cjs";
 
-const LOG = `${CONTROLLER_LOG} [HBO Max]`;
+const LOG = `${REMOTE_LOG} [HBO Max]`;
 
 // TODO: This code is completely untested it might work.
 async function startVideo(): Promise<void> {
@@ -67,7 +63,7 @@ async function startVideo(): Promise<void> {
 }
 
 export function init(): void {
-  // Only run the script if the tab was opened by Stream Channeler Controller.
+  // Only run the script if the tab was opened by Stream Channeler Remote.
   const loading = GM_getValue("loadingTab", false);
   if (!loading) return;
   GM_setValue("loadingTab", false);

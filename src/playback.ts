@@ -32,7 +32,7 @@ function handleButtonClick(event: MouseEvent): void {
     promptSetCurrentIndex();
     return;
   }
-  toggleRemoteController();
+  toggleRemote();
 }
 
 function updateButton(): void {
@@ -57,7 +57,7 @@ function updateButton(): void {
   }
 
   const icon = running ? STOP_ICON_SVG : PLAY_ICON_SVG;
-  const action = running ? "Stop Remote Controller" : "Start Remote Controller";
+  const action = running ? "Stop Remote" : "Start Remote";
   const displayed = running ? currentIndex + 1 : currentIndex;
   const counter = `<span id="remote-control-counter" style="cursor:pointer;text-decoration:underline">${displayed}/${cards.length}</span>`;
   button.innerHTML = `${icon}${action} (${counter})`;
@@ -77,9 +77,9 @@ function extractEpisodeInfo(card: HTMLElement): void {
 }
 
 function clickCurrentCard(): void {
-  // If all videos have been played stop remote controller.
+  // If all videos have been played stop remote.
   if (currentIndex >= cards.length) {
-    stopRemoteController();
+    stopRemote();
     return;
   }
 
@@ -97,12 +97,12 @@ function clickCurrentCard(): void {
   updateButton();
 }
 
-function stopRemoteController(): void {
+function stopRemote(): void {
   running = false;
   updateButton();
 }
 
-function startRemoteController(): void {
+function startRemote(): void {
   if (cards.length === 0) {
     cards = Array.from(
       document.querySelectorAll<HTMLElement>('[data-slot="card"]'),
@@ -110,7 +110,7 @@ function startRemoteController(): void {
     currentIndex = 0;
   }
   console.log(
-    `[Stream Channeler Controller] Starting at ${currentIndex}/${cards.length}`,
+    `[Stream Channeler Remote] Starting at ${currentIndex}/${cards.length}`,
   );
   running = true;
 
@@ -120,12 +120,12 @@ function startRemoteController(): void {
     GM_addValueChangeListener(
       "videoEnded",
       (_name: string, _oldValue: unknown, newValue: unknown) => {
-        // Only automatically load the next channel if stream channeler controller is in
+        // Only automatically load the next channel if Stream Channeler Remote is in
         // an active state.
         if (!running) return;
         if (typeof newValue !== "number")
           throw new Error(
-            `[Stream Channeler Controller] videoEnded value is not a number: ${newValue}`,
+            `[Stream Channeler Remote] videoEnded value is not a number: ${newValue}`,
           );
         currentIndex++;
         clickCurrentCard();
@@ -136,15 +136,15 @@ function startRemoteController(): void {
   clickCurrentCard();
 }
 
-function toggleRemoteController(): void {
+function toggleRemote(): void {
   if (running) {
-    stopRemoteController();
+    stopRemote();
   } else {
-    startRemoteController();
+    startRemote();
   }
 }
 
-export function initController(): void {
+export function initPlayback(): void {
   function syncState(): void {
     const newCards = Array.from(
       document.querySelectorAll<HTMLElement>('[data-slot="card"]'),

@@ -1,13 +1,9 @@
 // TODO: Validate
-import {
-  CONTROLLER_LOG,
-  initUrlChangePlugin,
-  waitForElement,
-} from "../../shared";
+import { REMOTE_LOG, initUrlChangePlugin, waitForElement } from "../../shared";
 
 export { hostnames, matches } from "./matches.cjs";
 
-const LOG = `${CONTROLLER_LOG} [Netflix]`;
+const LOG = `${REMOTE_LOG} [Netflix]`;
 
 // JustWatch never has direct episode links for Netflix.
 // TODO: This probably does not work.

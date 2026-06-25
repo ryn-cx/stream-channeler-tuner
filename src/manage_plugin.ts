@@ -4,10 +4,10 @@ import {
   getLastChannelId,
   setChannelQueues,
   setLastChannelId,
-} from "./antenna";
+} from "./manage";
 import { waitForElement } from "./shared";
 
-export interface AntennaPluginConfig {
+export interface ManagePluginConfig {
   website_name: string;
   buttonColor: string;
   textColor?: string;
@@ -32,9 +32,9 @@ const SELECT_STYLE =
 const INPUT_STYLE =
   "width:130px;padding:6px 10px;border-radius:4px;border:1px solid #3a4a5c;background:#1c252f;color:#fff;font-size:13px;";
 
-export function initAntennaPlugin(config: AntennaPluginConfig): void {
-  const LOG = `[Stream Channeler Antenna] [${config.website_name}]`;
-  const containerId = `antenna-${config.website_name.toLowerCase()}-container`;
+export function initManagePlugin(config: ManagePluginConfig): void {
+  const LOG = `[Stream Channeler Remote] [${config.website_name}]`;
+  const containerId = `manage-${config.website_name.toLowerCase()}-container`;
   const textColor = config.textColor ?? "#fff";
 
   // Tracks the user dismissing the footer. Intentionally not persisted — the
@@ -95,12 +95,12 @@ export function initAntennaPlugin(config: AntennaPluginConfig): void {
     container.style.cssText = FOOTER_STYLE;
 
     const title = document.createElement("span");
-    title.id = "antenna-title";
-    title.textContent = "Stream Channeler Antenna";
+    title.id = "manage-title";
+    title.textContent = "Stream Channeler Remote";
     title.style.cssText = "color:#fff;font-weight:600;white-space:nowrap;";
 
     const select = document.createElement("select");
-    select.id = "antenna-channel-select";
+    select.id = "manage-channel-select";
     select.style.cssText = SELECT_STYLE;
 
     for (const [id, channel] of channelEntries) {
@@ -125,14 +125,14 @@ export function initAntennaPlugin(config: AntennaPluginConfig): void {
     let sourceInput: HTMLInputElement | null = null;
     if (config.showSourceInput) {
       sourceInput = document.createElement("input");
-      sourceInput.id = "antenna-source-input";
+      sourceInput.id = "manage-source-input";
       sourceInput.type = "text";
       sourceInput.placeholder = "Source (optional)";
       sourceInput.style.cssText = INPUT_STYLE;
     }
 
     const btn = document.createElement("button");
-    btn.id = "antenna-add-btn";
+    btn.id = "manage-add-btn";
     btn.textContent = "Add to Channel";
     btn.style.cssText = `padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:${config.buttonColor};color:${textColor};font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;`;
 
@@ -178,7 +178,7 @@ export function initAntennaPlugin(config: AntennaPluginConfig): void {
     });
 
     const closeBtn = document.createElement("button");
-    closeBtn.id = "antenna-close-btn";
+    closeBtn.id = "manage-close-btn";
     closeBtn.textContent = "×";
     closeBtn.title = "Hide";
     closeBtn.setAttribute("aria-label", "Hide");

@@ -1,5 +1,5 @@
 // TODO: Validate
-import { initAntennaPlugin } from "../../antenna_plugin";
+import { initManagePlugin } from "../../manage_plugin";
 
 export { hostnames, matches } from "./matches.cjs";
 
@@ -9,7 +9,7 @@ export { hostnames, matches } from "./matches.cjs";
 const SERIES_ID_RE = /\/series\/([A-Z0-9]+)/;
 
 export function init(): void {
-  initAntennaPlugin({
+  initManagePlugin({
     website_name: "Crunchyroll",
     buttonColor: "#000000",
     urlRegex: /\/series\/[A-Z0-9]+/,

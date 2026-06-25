@@ -1,5 +1,5 @@
 // TODO: Validate
-export const CONTROLLER_LOG = "[Stream Channeler Controller]";
+export const REMOTE_LOG = "[Stream Channeler Remote]";
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -28,9 +28,7 @@ export function waitForElement<T extends Element>(
 
     const timeout = setTimeout(() => {
       observer.disconnect();
-      reject(
-        new Error(`${CONTROLLER_LOG} Timed out waiting for "${selector}"`),
-      );
+      reject(new Error(`${REMOTE_LOG} Timed out waiting for "${selector}"`));
     }, timeoutMs);
   });
 }
@@ -41,10 +39,10 @@ export function waitForElement<T extends Element>(
 // tab, regardless of which plugin detected the end.
 let autoControlStopped = false;
 
-// A small button pinned to a corner of every controller-opened tab so the user
-// can cancel automatic control of the current video. Styled to match the
-// Antenna "Add to Channel" widget. Placed bottom-left to avoid overlapping the
-// Antenna footer, which sits bottom-right.
+// A small button pinned to a corner of every remote-opened tab so the user can
+// cancel automatic control of the current video. Styled to match the Manage
+// "Add to Channel" widget. Placed bottom-left to avoid overlapping the Manage
+// footer, which sits bottom-right.
 export function createStopButton(): void {
   if (document.getElementById("stream-channeler-stop-btn")) return;
 
@@ -56,7 +54,7 @@ export function createStopButton(): void {
 
   button.addEventListener("click", () => {
     autoControlStopped = true;
-    console.log(`${CONTROLLER_LOG} Automatic control stopped by user`);
+    console.log(`${REMOTE_LOG} Automatic control stopped by user`);
     button.textContent = "Auto Control Stopped";
     button.disabled = true;
     button.style.opacity = "0.6";
@@ -102,7 +100,7 @@ export function requestFullscreenOnDoubleClick(config: {
   log?: string;
 }): void {
   if (config.isFullscreen()) return;
-  const log = config.log ?? CONTROLLER_LOG;
+  const log = config.log ?? REMOTE_LOG;
   console.log(
     `${log} Fullscreen requires a user gesture — double-click to enter fullscreen`,
   );
@@ -139,27 +137,27 @@ export function requestFullscreenOnDoubleClick(config: {
 export function signalEpisodeEnded(): void {
   if (autoControlStopped) {
     console.log(
-      `${CONTROLLER_LOG} Episode ended but automatic control is stopped — staying on tab`,
+      `${REMOTE_LOG} Episode ended but automatic control is stopped — staying on tab`,
     );
     return;
   }
 
-  console.log(`${CONTROLLER_LOG} Episode ended, closing tab`);
+  console.log(`${REMOTE_LOG} Episode ended, closing tab`);
   const now = Date.now();
   const current = GM_getValue("videoEnded", 0) as number;
-  console.log(`${CONTROLLER_LOG} Current videoEnded=${current}, now=${now}`);
+  console.log(`${REMOTE_LOG} Current videoEnded=${current}, now=${now}`);
   // Only signal if the current value is older (stop sets it to far future)
   if (now > current) {
     console.log(
-      `${CONTROLLER_LOG} Signaling episode ended (setting videoEnded=${now})`,
+      `${REMOTE_LOG} Signaling episode ended (setting videoEnded=${now})`,
     );
     GM_setValue("videoEnded", now);
   } else {
     console.log(
-      `${CONTROLLER_LOG} Skipping signal — current value is newer (stop was triggered?)`,
+      `${REMOTE_LOG} Skipping signal — current value is newer (stop was triggered?)`,
     );
   }
-  console.log(`${CONTROLLER_LOG} Closing tab`);
+  console.log(`${REMOTE_LOG} Closing tab`);
   window.close();
 }
 
@@ -169,8 +167,8 @@ export function signalEpisodeEnded(): void {
  * then watches for the URL to change.
  */
 export function initUrlChangePlugin(name: string): void {
-  const LOG = `${CONTROLLER_LOG} [${name}]`;
-  // Only run the script if the tab was opened by Stream Channeler Controller.
+  const LOG = `${REMOTE_LOG} [${name}]`;
+  // Only run the script if the tab was opened by Stream Channeler Remote.
   const loading = GM_getValue("loadingTab", false);
   if (!loading) return;
   GM_setValue("loadingTab", false);

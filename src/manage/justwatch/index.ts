@@ -1,10 +1,10 @@
 // TODO: Validate
-import { initAntennaPlugin } from "../../antenna_plugin";
+import { initManagePlugin } from "../../manage_plugin";
 
 export { hostnames, matches } from "./matches.cjs";
 
 export function init(): void {
-  initAntennaPlugin({
+  initManagePlugin({
     website_name: "JustWatch",
     buttonColor: "#fbc500",
     textColor: "#060d17",
