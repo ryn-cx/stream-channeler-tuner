@@ -35,7 +35,115 @@ export function waitForElement<T extends Element>(
   });
 }
 
+// When the user stops automatic control on a video tab, the page should stay
+// open and never advance the channel. Gating signalEpisodeEnded() is enough
+// because it is the single choke point that signals completion and closes the
+// tab, regardless of which plugin detected the end.
+let autoControlStopped = false;
+
+// A small button pinned to a corner of every controller-opened tab so the user
+// can cancel automatic control of the current video. Styled to match the
+// Antenna "Add to Channel" widget. Placed bottom-left to avoid overlapping the
+// Antenna footer, which sits bottom-right.
+export function createStopButton(): void {
+  if (document.getElementById("stream-channeler-stop-btn")) return;
+
+  const button = document.createElement("button");
+  button.id = "stream-channeler-stop-btn";
+  button.textContent = "Stop Auto Control";
+  button.style.cssText =
+    "position:fixed;bottom:16px;left:16px;z-index:2147483647;padding:6px 16px;border-radius:4px;border:1px solid #3a4a5c;background:#c0392b;color:#fff;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.5);";
+
+  button.addEventListener("click", () => {
+    autoControlStopped = true;
+    console.log(`${CONTROLLER_LOG} Automatic control stopped by user`);
+    button.textContent = "Auto Control Stopped";
+    button.disabled = true;
+    button.style.opacity = "0.6";
+    button.style.cursor = "default";
+  });
+
+  document.body.appendChild(button);
+}
+
+// A big, bright banner prompting the user to double-click so a plugin can enter
+// fullscreen. Spans the top of the screen and absorbs pointer events so
+// double-clicking it can't reach (and accidentally activate) the controls
+// behind it. Returns a function that removes it.
+function showFullscreenPrompt(): () => void {
+  const banner = document.createElement("div");
+  banner.id = "stream-channeler-fullscreen-prompt";
+  banner.textContent = "Double-click here to fullscreen the video";
+  banner.style.cssText =
+    "position:fixed;top:0;left:0;right:0;z-index:2147483647;padding:24px 16px;background:#e60019;color:#fff;font-family:system-ui,sans-serif;font-size:28px;font-weight:800;text-align:center;letter-spacing:0.5px;box-shadow:0 4px 16px rgba(0,0,0,0.5);cursor:pointer;";
+  document.body.appendChild(banner);
+  return () => banner.remove();
+}
+
+/**
+ * Enter fullscreen by clicking a player's fullscreen control. Browsers only
+ * allow requestFullscreen() during a transient user activation, so a scripted
+ * click is silently refused — fullscreen can only be triggered from the user's
+ * own gesture. This shows a prompt and, on the next double-click anywhere,
+ * clicks the fullscreen button synchronously inside the gesture handler (which
+ * carries the activation), then cleans up once fullscreen engages.
+ *
+ * @param config.isFullscreen Whether the player is currently fullscreen.
+ * @param config.getButton Returns the fullscreen control to click (re-queried
+ *   on each gesture so it survives DOM churn). Return null if not yet present.
+ * @param config.gestureTargets Extra documents to listen on besides the top
+ *   document — e.g. a same-origin player iframe whose own clicks must count.
+ * @param config.log Log prefix for diagnostics.
+ */
+export function requestFullscreenOnDoubleClick(config: {
+  isFullscreen: () => boolean;
+  getButton: () => HTMLElement | null;
+  gestureTargets?: () => Document[];
+  log?: string;
+}): void {
+  if (config.isFullscreen()) return;
+  const log = config.log ?? CONTROLLER_LOG;
+  console.log(
+    `${log} Fullscreen requires a user gesture — double-click to enter fullscreen`,
+  );
+
+  const removePrompt = showFullscreenPrompt();
+  const options = { capture: true } as const;
+  const targets = [document, ...(config.gestureTargets?.() ?? [])];
+
+  const onGesture = (): void => {
+    if (config.isFullscreen()) return;
+    const button = config.getButton();
+    if (button) {
+      console.log(`${log} Double-click detected, requesting fullscreen`);
+      button.click();
+    }
+  };
+
+  const cleanup = (): void => {
+    if (!config.isFullscreen()) return;
+    console.log(`${log} Fullscreen confirmed, removing prompt and listeners`);
+    removePrompt();
+    for (const target of targets) {
+      target.removeEventListener("dblclick", onGesture, options);
+    }
+    document.removeEventListener("fullscreenchange", cleanup);
+  };
+
+  for (const target of targets) {
+    target.addEventListener("dblclick", onGesture, options);
+  }
+  document.addEventListener("fullscreenchange", cleanup);
+}
+
 export function signalEpisodeEnded(): void {
+  if (autoControlStopped) {
+    console.log(
+      `${CONTROLLER_LOG} Episode ended but automatic control is stopped — staying on tab`,
+    );
+    return;
+  }
+
   console.log(`${CONTROLLER_LOG} Episode ended, closing tab`);
   const now = Date.now();
   const current = GM_getValue("videoEnded", 0) as number;
@@ -66,6 +174,8 @@ export function initUrlChangePlugin(name: string): void {
   const loading = GM_getValue("loadingTab", false);
   if (!loading) return;
   GM_setValue("loadingTab", false);
+
+  createStopButton();
 
   // Sites may redirect the URL immediately on load, so wait before
   // capturing the URL to avoid a false positive.

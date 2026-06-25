@@ -1,3 +1,4 @@
+// TODO: Validate
 const fs = require("node:fs");
 const path = require("node:path");
 const { author, version, repository, description } = require("../package.json");

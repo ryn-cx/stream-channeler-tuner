@@ -10,7 +10,7 @@ export { hostnames, matches } from "./matches.cjs";
 const LOG = `${CONTROLLER_LOG} [HBO Max]`;
 
 // TODO: This code is completely untested it might work.
-async function startEpisode(): Promise<void> {
+async function startVideo(): Promise<void> {
   const season = GM_getValue("seasonNumber", null) as number | null;
   const episode = GM_getValue("episodeNumber", null) as number | null;
   if (season === null || episode === null) {
@@ -81,5 +81,5 @@ export function init(): void {
 
   // Sometimes JustWatch uses a URL that just links to the show instead of the specific
   // episodes so the episode needs to be started manually.
-  startEpisode();
+  startVideo();
 }
