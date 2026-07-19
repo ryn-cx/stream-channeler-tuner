@@ -70,8 +70,13 @@ async function loadBlankChannels(): Promise<void> {
   const links = document.querySelectorAll<HTMLAnchorElement>(
     'a[href*="/channels/"]',
   );
+  // Channel ids are UUIDs. Match the full UUID as a complete path segment so
+  // non-channel links like /channels/browse are ignored (a loose [a-f0-9-]+
+  // would partial-match "browse" as the bogus id "b").
+  const channelIdRegex =
+    /\/channels\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?=$|[/?#])/;
   for (const link of links) {
-    const match = link.getAttribute("href")?.match(/\/channels\/([a-f0-9-]+)/);
+    const match = link.getAttribute("href")?.match(channelIdRegex);
     if (!match) continue;
     channels[match[1]] = {
       name: link.textContent.trim(),
@@ -80,19 +85,44 @@ async function loadBlankChannels(): Promise<void> {
     };
   }
 
-  // Fetch the shows already attached to each channel so plugins can detect when
-  // the current page URL is already present on a channel.
   const ids = Object.keys(channels);
-  const showUrlLists = await Promise.all(ids.map(fetchChannelShowUrls));
+  if (ids.length === 0) {
+    // No channel links found on the page — usually means the site's DOM changed
+    // or this isn't the channels page. Surface it instead of silently saving {}.
+    throw new Error(
+      `${LOG} No channels found on the page. The channels list DOM may have changed, or you may not be logged in.`,
+    );
+  }
+
+  // Fetch the shows already attached to each channel so plugins can detect when
+  // the current page URL is already present on a channel. Use allSettled so one
+  // failed fetch doesn't abort the whole load — channels are still worth saving.
+  const showUrlResults = await Promise.allSettled(
+    ids.map(fetchChannelShowUrls),
+  );
   let totalShows = 0;
+  const failed: string[] = [];
   ids.forEach((id, i) => {
-    channels[id].showUrls = showUrlLists[i];
-    totalShows += showUrlLists[i].length;
+    const result = showUrlResults[i];
+    if (result.status === "fulfilled") {
+      channels[id].showUrls = result.value;
+      totalShows += result.value.length;
+    } else {
+      console.error(
+        `${LOG} Failed to load shows for "${channels[id].name}":`,
+        result.reason,
+      );
+      failed.push(channels[id].name);
+    }
   });
 
   setChannelQueues(channels);
+  const failureNote =
+    failed.length > 0
+      ? `\n\n${failed.length} channel(s) failed to load shows (see console): ${failed.join(", ")}`
+      : "";
   alert(
-    `Loaded ${ids.length} channels (${totalShows} shows) into Stream Channeler Remote.`,
+    `Loaded ${ids.length} channels (${totalShows} shows) into Stream Channeler Remote.${failureNote}`,
   );
 }
 
@@ -134,7 +164,10 @@ function addButtonsToModal(dialog: Element): void {
   loadBtn.innerHTML = `${INSERT_ICON_SVG}Load Channels`;
   loadBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    void loadBlankChannels();
+    loadBlankChannels().catch((err: unknown) => {
+      console.error(`${LOG} Load Channels failed:`, err);
+      alert(err instanceof Error ? err.message : String(err));
+    });
   });
 
   const insertBtn = document.createElement("button");

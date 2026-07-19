@@ -44,16 +44,19 @@ function updateButton(): void {
   }
 
   if (!button) {
-    const buttons = document.querySelectorAll<HTMLButtonElement>("button");
-    const lastButton = buttons[buttons.length - 1];
-    if (!lastButton?.parentElement) return;
+    // Place the button right after the "Next" button in the header, matching its
+    // styling.
+    const nextButton = document
+      .querySelector<SVGElement>("svg.lucide-skip-forward")
+      ?.closest("button");
+    if (!nextButton?.parentElement) return;
 
     button = document.createElement("button");
     button.id = "remote-control-btn";
-    button.className = lastButton.className;
+    button.className = nextButton.className;
     button.setAttribute("data-slot", "button");
     button.addEventListener("click", handleButtonClick);
-    lastButton.parentElement.appendChild(button);
+    nextButton.after(button);
   }
 
   const icon = running ? STOP_ICON_SVG : PLAY_ICON_SVG;
